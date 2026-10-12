@@ -26,3 +26,16 @@ services:
     <<: *backend
     command: flask --app app run --host 0.0.0.0 --port 8000 --debug
     ports: ["8000:8000"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile_inline: |
+        FROM node:22
+        WORKDIR /app/frontend
+        COPY package.json ./
+        RUN npm install
+    volumes: ["./frontend:/app/frontend", "/app/frontend/node_modules"]
+    environment: { API_URL: "http://backend:8000" }
+    command: npm run dev -- --host 0.0.0.0
+    ports: ["5173:5173"]
