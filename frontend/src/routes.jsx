@@ -1,12 +1,20 @@
 import { Link, Outlet } from "react-router";
 
+import {
+  NotFoundPage,
+  TermsPage,
+} from "@/pages/AuthPages";
+
 export const appRoutes = [
   {
     path: "/",
     element: <PublicLayout />,
+    
     children: [
+      { path: "terms", element: <TermsPage /> },
     ],
   },
+  { path: "*", element: <NotFoundPage /> },
 ];
 
 export function PublicLayout() {
