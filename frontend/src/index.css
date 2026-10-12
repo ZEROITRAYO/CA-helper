@@ -1,0 +1,32 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+
+@theme {
+  --font-sans: "Geist Variable", sans-serif;
+
+  --color-background: rgb(255, 255, 255);
+  --color-ink: rgb(10, 10, 10);
+  --color-card: rgb(255, 255, 255);
+  --color-primary: rgb(23, 23, 23);
+  --color-secondary: rgb(245, 245, 245);
+  --color-soft: rgb(245, 245, 245);
+  --color-hint: rgb(115, 115, 115);
+  --color-danger: rgb(231, 0, 11);
+  --color-border: rgb(229, 229, 229);
+  --color-input: rgb(229, 229, 229);
+  --color-focus: rgb(161, 161, 161);
+
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-4xl: 1.625rem;
+}
+
+* {
+  @apply border-border outline-focus/50;
+}
+
+body {
+  @apply bg-background text-ink font-sans;
+}
+
