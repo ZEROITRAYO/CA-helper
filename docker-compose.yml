@@ -1,0 +1,28 @@
+# docker compose up                   app, API, Mailpit
+# docker compose --profile worker up  also the scheduled jobs (only ONE teammate runs this)
+# App http://localhost:5173 · API http://localhost:8000 · Mail http://localhost:8025
+x-backend: &backend
+  build:
+    context: ./backend
+    dockerfile_inline: |
+      FROM python:3.12-slim
+      RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr \
+          && rm -rf /var/lib/apt/lists/*
+      COPY requirements.txt ./
+      RUN pip install --no-cache-dir -r requirements.txt
+  volumes: [".:/app"]
+  working_dir: /app/backend
+  env_file: .env                       # DATABASE_URL = the shared Neon database
+  environment:
+    MAIL_SERVER: mailpit
+    MAIL_PORT: "1025"
+
+services:
+  mailpit:
+    image: axllent/mailpit:v1.31
+    ports: ["8025:8025"]
+
+  backend:
+    <<: *backend
+    command: flask --app app run --host 0.0.0.0 --port 8000 --debug
+    ports: ["8000:8000"]
