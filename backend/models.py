@@ -14,7 +14,6 @@ def db_now():
 
 
 class EncryptedText(db.TypeDecorator):
-
     impl = db.Text
     cache_ok = True
 
