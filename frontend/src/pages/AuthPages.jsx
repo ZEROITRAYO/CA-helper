@@ -1,9 +1,6 @@
 import { Link } from "react-router";
 import { Section } from "@/components/shared";
 
-// --- TermsPage ---------------------------------------------------------------------------------
-
-// Plain-language terms: what we store, how it is protected, who sees it, what we do not do.
 const SECTIONS = [
   {
     title: "What CA Helper does",
@@ -39,7 +36,7 @@ const SECTIONS = [
   },
 ];
 
-/** /terms: the Terms and Privacy Policy, in plain language. */
+
 export function TermsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -56,8 +53,6 @@ export function TermsPage() {
     </div>
   );
 }
-
-// --- NotFoundPage ------------------------------------------------------------------------------
 
 export function NotFoundPage() {
   return (

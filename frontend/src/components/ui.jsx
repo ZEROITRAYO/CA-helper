@@ -1,7 +1,5 @@
-// Small styled building blocks (Button, Card, Input, Label, Badge), made with Tailwind classes.
 import { cn } from "@/lib";
 
-// --- button ------------------------------------------------------------------------------------
 
 const BUTTON_STYLES = {
   default: "bg-primary text-primary-foreground hover:bg-primary/80",
@@ -15,7 +13,6 @@ const BUTTON_SIZES = {
   sm: "h-7 rounded-md px-2.5 text-[0.8rem]",
 };
 
-/** The classes of a button; also used to make a <Link> look like one. */
 export function buttonClass(variant = "default", size = "default", className = "") {
   return cn(
     "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
@@ -25,14 +22,12 @@ export function buttonClass(variant = "default", size = "default", className = "
   );
 }
 
-/** A text link in the app's colour. */
 export const linkClass = "text-primary underline-offset-4 hover:underline";
 
 export function Button({ className, variant = "default", size = "default", ...props }) {
   return <button className={buttonClass(variant, size, className)} {...props} />;
 }
 
-// --- card --------------------------------------------------------------------------------------
 
 export function Card({ className, ...props }) {
   return (
@@ -63,7 +58,6 @@ export function CardContent({ className, ...props }) {
   return <div className={cn("px-4", className)} {...props} />;
 }
 
-// --- input, select, textarea and label ---------------------------------------------------------
 
 const FIELD_FOCUS =
   "rounded-lg border border-input bg-transparent text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -102,7 +96,6 @@ export function Label({ className, ...props }) {
   );
 }
 
-// --- badge -------------------------------------------------------------------------------------
 
 const BADGE_STYLES = {
   default: "bg-primary text-primary-foreground",
