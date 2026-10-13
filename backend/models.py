@@ -11,7 +11,7 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 
-def now():
+def db_now():
     return datetime.now(timezone.utc)
 
 
@@ -37,7 +37,24 @@ class Table(db.Model):
 
     __abstract__ = True
     id = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    created_at = db.Column(db.DateTime(timezone=True), default=now)
-    updated_at = db.Column(db.DateTime(timezone=True), default=now, onupdate=now)
+    created_at = db.Column(db.DateTime(timezone=True), default=db_now)
+    updated_at = db.Column(db.DateTime(timezone=True), default=db_now, onupdate=db_now)
 
 
+class User(Table):
+    __tablename__ = "users"
+    email = db.Column(db.String(254), unique=True)  
+    password_hash = db.Column(db.String(255))
+    full_name = db.Column(db.String(200))
+    role = db.Column(db.String(50))  # business / ca / admin
+    email_verified = db.Column(db.Boolean, default=False) 
+    email_notifications = db.Column(db.Boolean, default=True)
+
+
+class EmailOtp(Table):
+    __tablename__ = "email_otps"
+    user_id = db.Column(db.Uuid, db.ForeignKey("users.id"))
+    purpose = db.Column(db.String(50))  # verify_email / reset_password
+    code_hash = db.Column(db.String(255))
+    expires_at = db.Column(db.DateTime(timezone=True))
+    used_at = db.Column(db.DateTime(timezone=True))

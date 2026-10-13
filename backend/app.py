@@ -2,7 +2,8 @@ import os
 from flask import Flask, jsonify
 from flask_jwt_extended import JWTManager
 from werkzeug.exceptions import HTTPException
-from models import db
+from models import db, User
+import uuid
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
@@ -26,9 +27,25 @@ with app.app_context():
     db.create_all()
 
 
+@jwt.user_lookup_loader
+def load_user(header, payload):
+    return db.session.get(User, uuid.UUID(payload["sub"]))  #token has the user id
+
+@jwt.unauthorized_loader
+def no_token(reason):
+    return jsonify({"error": {"code": "AUTH_REQUIRED", "message": "Please log in."}}), 401
+
+@jwt.invalid_token_loader
+def bad_token(reason):
+    return jsonify({"error": {"code": "TOKEN_INVALID", "message": "Please log in again."}}), 401
+
+@jwt.user_lookup_error_loader
+def user_gone(header, payload):
+    return jsonify({"error": {"code": "ACCOUNT_INACTIVE", "message": "This account no longer exists."}}), 401
+
 
 @app.errorhandler(HTTPException)
 def http_error(error):
     return jsonify({"error": {"code": error.name, "message": error.description}}), error.code
 
-
+import routes_auth
