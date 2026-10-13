@@ -5,9 +5,6 @@ status: DONE
 
 # GSTR-1: what it is and why it matters
 
-<!-- Reviewed on 29 Sep 2026 against the official pages listed at the bottom (V1). Content rule
-     (content/README.md): no legal thresholds, rates or due dates here; the app shows them from the
-     rule tables. -->
 
 ## What is it?
 GSTR-1 is the GST return in which you report your **sales**: every invoice you issued in the period, the credit and debit notes, and a summary by product or service (HSN/SAC code). Your customers' tax credit depends on it: what you report here appears in their own GST statements (GSTR-2B).
