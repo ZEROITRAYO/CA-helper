@@ -1,4 +1,3 @@
-// Pieces several pages use: query status, errors, cards, fields, tables, CA facts, engagements.
 import {
   Card,
   CardContent,
@@ -7,7 +6,6 @@ import {
   CardTitle,
 } from "@/components/ui";
 
-/** A card with a title, an optional description and optional content. */
 export function Section({ title, description, contentClassName, children, ...cardProps }) {
   return (
     <Card {...cardProps}>
