@@ -68,7 +68,7 @@ class Business(Table):
     __tablename__ = "businesses"
     user_id = db.Column(db.Uuid, db.ForeignKey("users.id"), unique=True)
     legal_name = db.Column(db.String(200))
-    entity_type = db.Column(db.String(50))  # individual, proprietorship, partnership, llp, private_limited
+    entity_type = db.Column(db.String(50))  
     state = db.Column(db.String(50))
     address = db.Column(db.String(500))
     description = db.Column(db.String(1000))
@@ -79,7 +79,7 @@ class Business(Table):
     gst_registered = db.Column(db.Boolean)
     gstin = db.Column(EncryptedText)
     gst_composition = db.Column(db.Boolean, default=False)
-    gst_qrmp = db.Column(db.Boolean, default=False)  # quarterly GST returns
+    gst_qrmp = db.Column(db.Boolean, default=False)  #
     accounts_audited_other_law = db.Column(db.Boolean, default=False)
     deducts_tds = db.Column(db.Boolean)
     tan = db.Column(EncryptedText)
@@ -169,7 +169,7 @@ class PenaltyRule(Table):
 class ReminderLog(Table):
     __tablename__ = "reminder_log"
     compliance_item_id = db.Column(db.Uuid, db.ForeignKey("compliance_items.id"))
-    kind = db.Column(db.String(50))  # t_minus_7, t_minus_3, t_minus_1 or overdue
+    kind = db.Column(db.String(50))  
     sent_at = db.Column(db.DateTime(timezone=True))
 
 
