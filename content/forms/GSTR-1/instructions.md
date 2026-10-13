@@ -5,10 +5,6 @@ status: DONE
 
 # How to file GSTR-1 yourself
 
-<!-- Reviewed on 29 Sep 2026 against the official pages listed at the bottom (V1). Content rule
-     (content/README.md): no legal thresholds, rates or due dates here; the app shows them from the
-     rule tables. -->
-
 ## Before you start
 Tick the documents in the checklist on this page, and keep your login details ready. File any earlier GSTR-1
 and GSTR-3B that is still missing first: the portal files returns in order.

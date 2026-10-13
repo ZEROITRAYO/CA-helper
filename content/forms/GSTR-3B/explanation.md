@@ -5,9 +5,6 @@ status: DONE
 
 # GSTR-3B: what it is and why it matters
 
-<!-- Reviewed on 29 Sep 2026 against the official pages listed at the bottom (V1). Content rule
-     (content/README.md): no legal thresholds, rates or due dates here; the app shows them from the
-     rule tables. -->
 
 ## What is it?
 GSTR-3B is the summary GST return in which you **pay your GST**. You report your total sales, the tax credit you claim on purchases (input tax credit), and pay the difference. Much of it is filled in for you from your GSTR-1 and from GSTR-2B (the statement of credit from your suppliers).
