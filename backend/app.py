@@ -1,11 +1,16 @@
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, redirect
 from flask_jwt_extended import JWTManager
 from werkzeug.exceptions import HTTPException
 from models import db, User
 import uuid
 
 app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return redirect("/api/health")
+
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
