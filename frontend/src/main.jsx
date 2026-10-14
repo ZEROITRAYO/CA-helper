@@ -7,6 +7,7 @@ import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 
 import { appRoutes } from "@/routes";
+import { AuthProvider } from "@/auth";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,7 +20,9 @@ const router = createBrowserRouter(appRoutes);
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
