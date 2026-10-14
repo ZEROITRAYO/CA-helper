@@ -171,6 +171,15 @@ class ReminderLog(Table):
     kind = db.Column(db.String(50))  
     sent_at = db.Column(db.DateTime(timezone=True))
 
+class Notification(Table):
+    __tablename__ = "notifications"
+    user_id = db.Column(db.Uuid, db.ForeignKey("users.id"))
+    type = db.Column(db.String(50))
+    title = db.Column(db.String(200))
+    body = db.Column(db.String(2000))
+    link = db.Column(db.String(300))
+    read_at = db.Column(db.DateTime(timezone=True))
+
 
 class Document(Table):
     __tablename__ = "documents"

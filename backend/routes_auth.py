@@ -6,9 +6,9 @@ from flask import jsonify, request
 from flask_jwt_extended import create_access_token
 from app import app
 from helpers import (
-    check_password, current_user, error, hash_password, role_required, send_email,
+    check_password, current_user, error, hash_password, iso, page_of, role_required, send_email,
 )
-from models import EmailOtp, User, db, db_now
+from models import EmailOtp, Notification, User, db, db_now
 
 
 PASSWORD_RULE = "Use atleast 8 characters, with at least one letter and one number."
@@ -138,10 +138,39 @@ def login():
         return error(401, "INVALID_CREDENTIALS", "Wrong email or password")
     
     if not user.email_verified:
-        return error(403, "EMAIL_NOT_VERIFIED", "Verify your email before loging in")
+        return error(403, "EMAIL_NOT_VERIFIED", "Verify your email before logging in")
     
     token = create_access_token(identity=str(user.id), additional_claims={"role": user.role})
     return jsonify({"access_token": token, "user": user_to_dict(user)})
+
+@app.route("/api/v1/auth/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip().lower()
+    user = find_user(email)
+    if user is None:
+        return error(404, "USER_NOT_FOUND", "No account uses this email.")
+    send_otp(user, "reset_password")
+    return "", 204
+
+
+@app.route("/api/v1/auth/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    new_password = str(data.get("new_password") or "")
+    if not good_password(new_password):
+        return error(422, "VALIDATION_ERROR", PASSWORD_RULE)
+    email = str(data.get("email") or "").strip().lower()
+    otp = str(data.get("code") or "").strip()
+    user = find_user(email)
+    otp_error = check_otp(user, "reset_password", otp)
+    if otp_error:
+        return otp_error
+    user.email_verified = True
+    user.password_hash = hash_password(new_password)
+    db.session.commit()
+    send_email(user.email, "Your account password was changed", "password_changed", name=user.full_name)
+    return "", 204
 
 
 @app.route("/api/v1/auth/me")
@@ -149,3 +178,42 @@ def login():
 def my_account():
     return jsonify(user_to_dict(current_user()))
 
+@app.route("/api/v1/auth/settings", methods=["GET", "PUT"])
+@role_required("business", "ca")
+def settings():
+    """The switch for notification emails (emails with an OTP always go out)."""
+    user = current_user()
+    if request.method == "PUT":
+        value = (request.get_json(silent=True) or {}).get("email_notifications")
+        if not isinstance(value, bool):
+            return error(422, "VALIDATION_ERROR", "Send email_notifications as true or false.")
+        user.email_notifications = value
+        db.session.commit()
+    return jsonify({"email_notifications": user.email_notifications})
+
+
+def notification_to_dict(notification):
+    return {"id": str(notification.id), "type": notification.type, "title": notification.title,
+            "body": notification.body, "link": notification.link, "read_at": iso(notification.read_at),
+            "created_at": iso(notification.created_at)}
+
+
+@app.route("/api/v1/alerts/notifications")
+@role_required("business", "ca", "admin")
+def list_notifications():
+    """The user's notifications, newest first, a page at a time."""
+    query = Notification.query.filter_by(user_id=current_user().id)
+    query = query.order_by(Notification.created_at.desc(), Notification.id)
+    return jsonify(page_of(query, notification_to_dict))
+
+
+@app.route("/api/v1/alerts/notifications/<uuid:notification_id>/read", methods=["POST"])
+@role_required("business", "ca", "admin")
+def mark_read(notification_id):
+    notification = db.session.get(Notification, notification_id)
+    if notification is None or notification.user_id != current_user().id:
+        return error(404, "NOTIFICATION_NOT_FOUND", "This notification was not found.")
+    if notification.read_at is None:
+        notification.read_at = db_now()
+    db.session.commit()
+    return jsonify(notification_to_dict(notification))
