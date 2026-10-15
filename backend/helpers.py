@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -7,7 +8,8 @@ from flask_jwt_extended import get_current_user, jwt_required
 import smtplib
 from email.message import EmailMessage
 from argon2 import PasswordHasher
-from models import Notification, db
+from models import Notification, db, Business
+from decimal import Decimal
 
 REPO = Path(__file__).resolve().parent.parent  
 
@@ -34,6 +36,12 @@ def role_required(*roles):
 def current_user():
     return get_current_user()
 
+def now():
+    return datetime.now(ZoneInfo("Asia/Kolkata")).date()
+
+
+def my_business():
+    return Business.query.filter_by(user_id=current_user().id).first()
 
 def now():
     return datetime.now(ZoneInfo("Asia/Kolkata")).date()
@@ -46,6 +54,16 @@ def date(time):
 def iso(value):
     return value.isoformat() if value is not None else None
 
+def money(value):
+    return None if value is None else f"{Decimal(value):.2f}"
+
+def format_inr(amount):
+    digits = str(int(amount))
+    head, groups = digits[:-3], [digits[-3:]]
+    while head:
+        groups.insert(0, head[-2:])
+        head = head[:-2]
+    return "₹" + ",".join(groups)
 
 def page_of(query, to_dict):
     page = max(request.args.get("page", 1, type=int), 1)
@@ -85,10 +103,43 @@ def notify(user, kind, title, body, link=None):
     db.session.add(notification)
     return notification
 
+def read_amount(value, lowest, highest):
+    if isinstance(value, bool):
+        return None
+    try:
+        amount = round(Decimal(str(value)), 2)
+        return amount if lowest <= amount <= highest else None
+    except Exception:  # not a number at all
+        return None
 
 def email_notice(user, title, body):
     if user.email_notifications:
         send_email(user.email, title, "notification", name=user.full_name, title=title, body=body)
 
 
+GST_STATES = json.loads((REPO / "content/reference/gst_states.json").read_text())["states"]
+
+def state_code(name):
+    for state in GST_STATES:
+        if state["name"] == name:
+            return state["code"]
+    return None
+
+def gstin_check_character(first_14):
+    characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    total = 0
+    for index, character in enumerate(first_14):
+        product = characters.index(character) * (1 if index % 2 == 0 else 2)
+        total += product // 36 + product % 36
+    return characters[(36 - total % 36) % 36]
+
+def gstin_error(gstin, pan, state):
+    if gstin_check_character(gstin[:14]) != gstin[14]:
+        return "This GSTIN seems not valid: its last character does not match. Check for a typo error!"
+    code = state_code(state)
+    if code and gstin[:2] != code:
+        return f"This GSTIN starts with {gstin[:2]}, but the code of {state} is {code}."
+    if pan and gstin[2:12] != pan:
+        return "The PAN inside this GSTIN (characters 3 to 12) does not match your PAN."
+    return None
 
