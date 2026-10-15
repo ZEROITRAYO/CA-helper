@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { z } from "zod"; 
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -29,3 +30,14 @@ export function clearSession() {
   } catch {
   }
 }
+
+export const PASSWORD_RULE_TEXT =
+  "Use at least 8 characters, with at least one letter and one number";
+
+export const ROLE_HOME = {
+  business: "/business",
+  ca: "/ca",
+  admin: "/admin",
+};
+
+export const emailSchema = z.email("Enter a valid email address");
