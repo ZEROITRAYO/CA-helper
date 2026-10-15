@@ -15,14 +15,14 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False  # stay logged in until "Log out"
-app.config["FIELD_ENCRYPTION_KEY"] = os.environ.get("FIELD_ENCRYPTION_KEY")  # for PAN, GSTIN, TAN, phone
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False 
+app.config["FIELD_ENCRYPTION_KEY"] = os.environ.get("FIELD_ENCRYPTION_KEY")  
 app.config["MAX_UPLOAD_MB"] = 5
-app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024  # bigger requests are refused
+app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024  
 app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "localhost")
 app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", "1025"))
 app.config["MAIL_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "CA Helper <no-reply@ca-helper.local>")
-app.config["MAIL_SUPPRESS_SEND"] = False  # True keeps emails in helpers.outbox instead of sending them
+app.config["MAIL_SUPPRESS_SEND"] = False  
 
 db.init_app(app)
 jwt = JWTManager(app)
@@ -34,7 +34,7 @@ with app.app_context():
 
 @jwt.user_lookup_loader
 def load_user(header, payload):
-    return db.session.get(User, uuid.UUID(payload["sub"]))  #token has the user id
+    return db.session.get(User, uuid.UUID(payload["sub"]))  
 
 @jwt.unauthorized_loader
 def no_token(reason):
