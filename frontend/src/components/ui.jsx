@@ -2,9 +2,9 @@ import { cn } from "@/lib";
 
 
 const BUTTON_STYLES = {
-  default: "bg-primary text-primary-foreground hover:bg-primary/80",
-  outline: "border-border bg-background hover:bg-muted hover:text-foreground",
-  ghost: "hover:bg-muted hover:text-foreground",
+  default: "bg-primary text-white hover:bg-primary/80",
+  outline: "border-border bg-background hover:bg-soft hover:text-ink",
+  ghost: "hover:bg-soft hover:text-ink",
   link: "text-primary underline-offset-4 hover:underline",
 };
 
@@ -15,7 +15,7 @@ const BUTTON_SIZES = {
 
 export function buttonClass(variant = "default", size = "default", className = "") {
   return cn(
-    "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-focus focus-visible:ring-3 focus-visible:ring-focus/50 disabled:pointer-events-none disabled:opacity-50",
     BUTTON_STYLES[variant],
     BUTTON_SIZES[size],
     className,
@@ -34,7 +34,7 @@ export function Card({ className, ...props }) {
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10",
+        "flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-ink ring-1 ring-ink/10",
         className,
       )}
       {...props}
@@ -51,7 +51,7 @@ export function CardTitle({ className, ...props }) {
 }
 
 export function CardDescription({ className, ...props }) {
-  return <div className={cn("text-sm text-muted-foreground", className)} {...props} />;
+  return <div className={cn("text-sm 	text-hint", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }) {
@@ -60,7 +60,7 @@ export function CardContent({ className, ...props }) {
 
 
 const FIELD_FOCUS =
-  "rounded-lg border border-input bg-transparent text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "rounded-lg border border-input bg-transparent text-sm outline-none focus-visible:border-focus focus-visible:ring-3 focus-visible:ring-focus/50";
 
 export function Select({ className, ...props }) {
   return <select className={cn("h-8 w-full px-2", FIELD_FOCUS, className)} {...props} />;
@@ -69,7 +69,7 @@ export function Select({ className, ...props }) {
 export function Textarea({ className, ...props }) {
   return (
     <textarea
-      className={cn("w-full px-2.5 py-1.5 aria-invalid:border-destructive", FIELD_FOCUS, className)}
+      className={cn("w-full px-2.5 py-1.5 aria-invalid:border-danger", FIELD_FOCUS, className)}
       {...props}
     />
   );
@@ -79,7 +79,7 @@ export function Input({ className, ...props }) {
   return (
     <input
       className={cn(
-        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm",
+        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink placeholder:	text-hint focus-visible:border-focus focus-visible:ring-3 focus-visible:ring-focus/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-danger aria-invalid:ring-3 aria-invalid:ring-danger/20 md:text-sm",
         className,
       )}
       {...props}
@@ -98,10 +98,10 @@ export function Label({ className, ...props }) {
 
 
 const BADGE_STYLES = {
-  default: "bg-primary text-primary-foreground",
-  secondary: "bg-secondary text-secondary-foreground",
-  destructive: "bg-destructive/10 text-destructive",
-  outline: "border-border text-foreground",
+  default: "bg-primary text-white",
+  secondary: "bg-secondary text-ink",
+  destructive: "bg-danger/10 text-danger",
+  outline: "border-border text-ink",
 };
 
 export function Badge({ className, variant = "default", ...props }) {
