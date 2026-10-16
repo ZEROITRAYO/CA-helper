@@ -53,7 +53,9 @@ export function errorMessage(error) {
 async function get(path, notFound) {
   try {
     return await apiFetch(path);
-  } catch (error) {
+  } 
+  
+  catch (error) {
     if (notFound && error.code === notFound) return null;
     throw error;
   }
@@ -65,26 +67,39 @@ function useGet(queryKey, path, { notFound, ...options } = {}) {
 
 function sendForm(path, fields) {
   const form = new FormData();
+  
   for (const [name, value] of Object.entries(fields)) {
     if (value) form.append(name, value);
   }
+  
   return apiFetch(path, { method: "POST", body: form });
 }
 
 function withQuery(path, params) {
   const query = new URLSearchParams();
+  
   for (const [name, value] of Object.entries(params)) {
     if (value !== "" && value !== null && value !== undefined) query.set(name, value);
   }
+  
   const text = query.toString();
+  
   return text ? path + "?" + text : path;
 }
 
 export function useRefresh() {
   const queryClient = useQueryClient();
+  
   return function refresh(...keys) {
     for (const key of keys) {
       queryClient.invalidateQueries({ queryKey: key });
     }
   };
+}
+
+export function signup({ full_name, email, password, role }) {
+  return apiFetch("/api/v1/auth/signup", {
+    method: "POST",
+    body: { full_name, email, password, role, terms_accepted: true },
+  });
 }

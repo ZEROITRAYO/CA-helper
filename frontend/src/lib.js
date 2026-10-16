@@ -8,6 +8,16 @@ export function cn(...inputs) {
 
 const STORAGE_KEY = "ca-helper.session";
 
+export const USER_ROLE_LABELS = {
+  business: "Business",
+  ca: "Chartered Accountant",
+  admin: "Admin",
+};
+
+export function label(labels, code) {
+  return labels[code] ?? code;
+}
+
 export function loadSession() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -31,13 +41,25 @@ export function clearSession() {
   }
 }
 
-export const PASSWORD_RULE_TEXT =
-  "Use at least 8 characters, with at least one letter and one number";
-
 export const ROLE_HOME = {
   business: "/business",
   ca: "/ca",
   admin: "/admin",
 };
 
+export const newPasswordSchema = z
+  .string()
+  .min(8, "Use at least 8 characters, with at least one letter and one number")
+  .regex(/[A-Za-z]/, "Use at least 8 characters, with at least one letter and one number")
+  .regex(/[0-9]/, "Use at least 8 characters, with at least one letter and one number");
+
 export const emailSchema = z.email("Enter a valid email address");
+
+export function passwordsMatch(values) {
+  return values.password === values.confirm_password;
+}
+
+export const PASSWORDS_MATCH_ERROR = {
+  message: "The passwords do not match",
+  path: ["confirm_password"],
+};

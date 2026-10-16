@@ -4,6 +4,8 @@ import {
   NotFoundPage,
   TermsPage,
   LoginPage, 
+  HomePage,   
+  SignupPage,
 } from "@/pages/AuthPages";
 
 export const appRoutes = [
@@ -14,6 +16,8 @@ export const appRoutes = [
     children: [
       { path: "terms", element: <TermsPage /> },
       { path: "login", element: <LoginPage /> },
+      { index: true, element: <HomePage /> },
+      { path: "signup", element: <SignupPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },
