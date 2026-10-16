@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager
 from werkzeug.exceptions import HTTPException
 from models import db, User
 import uuid
+from sqlalchemy import text
 
 app = Flask(__name__)
 
@@ -52,5 +53,16 @@ def user_gone(header, payload):
 @app.errorhandler(HTTPException)
 def http_error(error):
     return jsonify({"error": {"code": error.name, "message": error.description}}), error.code
+
+@app.route("/api/health")
+def health():
+    try:
+        db.session.execute(text("SELECT 1"))
+        return jsonify({"status": "ok", "database": "ok"})
+    
+    except Exception:
+        print("Database unavailable")
+        db.session.rollback()
+        return jsonify({"status": "bad", "database": "unavailable"}), 503
 
 import routes_auth
