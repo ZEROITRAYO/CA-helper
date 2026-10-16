@@ -319,7 +319,6 @@ export function HomePage() {
         ) : (
           <div className="flex gap-2">
             <Link to="/login" className={buttonClass()}>Log in</Link>
-            <Link to="/signup" className={buttonClass("outline")}>Create an account</Link>
           </div>
         )}
       </div>
@@ -338,7 +337,7 @@ export function HomePage() {
               <CardHeader>
                 <CardTitle>{audience.title}</CardTitle>
                 <CardDescription>{audience.text}</CardDescription>
-                <span className="text-sm font-medium text-primary">{audience.action} →</span>
+                <span className="text-sm font-medium text-primary">{audience.action} </span>
               </CardHeader>
             </Card>
 
