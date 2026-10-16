@@ -43,8 +43,6 @@ def now():
 def my_business():
     return Business.query.filter_by(user_id=current_user().id).first()
 
-def now():
-    return datetime.now(ZoneInfo("Asia/Kolkata")).date()
 
 
 def date(time):
@@ -64,6 +62,8 @@ def format_inr(amount):
         groups.insert(0, head[-2:])
         head = head[:-2]
     return "₹" + ",".join(groups)
+
+
 
 def page_of(query, to_dict):
     page = max(request.args.get("page", 1, type=int), 1)
@@ -86,6 +86,8 @@ def check_password(password_hash, password):
     except Exception:
         return False
 
+
+
 def send_email(to, subject, template, **values):
     message = EmailMessage()
     message["From"] = current_app.config["MAIL_SENDER"]
@@ -98,10 +100,14 @@ def send_email(to, subject, template, **values):
     except OSError:
         print("Could not send the email") 
 
+
+
 def notify(user, kind, title, body, link=None):
     notification = Notification(user_id=user.id, type=kind, title=title, body=body, link=link)
     db.session.add(notification)
     return notification
+
+
 
 def read_amount(value, lowest, highest):
     if isinstance(value, bool):
@@ -109,8 +115,10 @@ def read_amount(value, lowest, highest):
     try:
         amount = round(Decimal(str(value)), 2)
         return amount if lowest <= amount <= highest else None
-    except Exception:  # not a number at all
+    except Exception: 
         return None
+
+
 
 def email_notice(user, title, body):
     if user.email_notifications:
@@ -132,6 +140,8 @@ def gstin_check_character(first_14):
         product = characters.index(character) * (1 if index % 2 == 0 else 2)
         total += product // 36 + product % 36
     return characters[(36 - total % 36) % 36]
+
+
 
 def gstin_error(gstin, pan, state):
     if gstin_check_character(gstin[:14]) != gstin[14]:
