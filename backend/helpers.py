@@ -153,3 +153,21 @@ def gstin_error(gstin, pan, state):
         return "The PAN inside this GSTIN (characters 3 to 12) does not match your PAN."
     return None
 
+
+FILE_STARTS = {"application/pdf": b"%PDF-", "image/jpeg": b"\xff\xd8\xff", "image/png": b"\x89PNG\r\n\x1a\n"}
+
+
+def read_upload():
+    upload = request.files.get("file")
+    if upload is None:
+        return None, None, error(422, "VALIDATION_ERROR", "Choose a file to upload!")
+    data = upload.read()
+    max_mb = current_app.config["MAX_UPLOAD_MB"]
+    if not data:
+        return None, None, error(400, "FILE_EMPTY", "File is empty.")
+    start = FILE_STARTS.get(upload.mimetype)
+    if start is None or not data.startswith(start):
+        return None, None, error(400, "FILE_TYPE_NOT_ALLOWED", "Allowed types are JPG, PNG, PDF only.")
+    if len(data) > max_mb * 1024 * 1024:
+        return None, None, error(400, "FILE_TOO_LARGE", f"The file is larger than {max_mb} MB!")
+    return upload, data, None
