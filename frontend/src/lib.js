@@ -47,8 +47,7 @@ export const ROLE_HOME = {
   admin: "/admin",
 };
 
-export const newPasswordSchema = z
-  .string()
+export const newPasswordSchema = z.string()
   .min(8, "Use at least 8 characters, with at least one letter and one number")
   .regex(/[A-Za-z]/, "Use at least 8 characters, with at least one letter and one number")
   .regex(/[0-9]/, "Use at least 8 characters, with at least one letter and one number");
@@ -63,3 +62,8 @@ export const PASSWORDS_MATCH_ERROR = {
   message: "The passwords do not match",
   path: ["confirm_password"],
 };
+
+export const otpSchema = z.string()
+  .trim()
+  .regex(/^[0-9]{6}$/, "Enter the 6 digit otp from the email");
+

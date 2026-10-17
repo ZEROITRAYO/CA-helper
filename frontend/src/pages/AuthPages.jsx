@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { ApiRequestError, errorMessage, signup} from "@/api";
+import { ApiRequestError, errorMessage, signup, verifyEmail, forgotPassword, resendVerificationCode, resetPassword} from "@/api";
 import { useAuth } from "@/auth";
 import { field, FormCard, FormField, Notice, Section, ErrorText } from "@/components/shared";
 import { Button, buttonClass, Card, CardDescription, CardHeader, CardTitle, linkClass } from "@/components/ui";
-import { emailSchema, newPasswordSchema, PASSWORDS_MATCH_ERROR, passwordsMatch, ROLE_HOME} from "@/lib";
+import { emailSchema, newPasswordSchema, PASSWORDS_MATCH_ERROR, passwordsMatch, ROLE_HOME, otpSchema} from "@/lib";
 
 const SECTIONS = [
   {
@@ -78,6 +78,36 @@ function SubmitButton({ form, busyText, children }) {
   );
 }
 
+function ResendButton({ form, send, setMessage }) {
+  const [loading, setLoading] = useState(false);
+
+  async function onResend() {
+    setMessage({});
+
+    const emailIsValid = await form.trigger("email");
+    if (!emailIsValid) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await send(form.getValues("email"));
+      setMessage({ notice: "We sent a new code to this email" });
+    }    
+    catch (error) {
+      setMessage({ error: errorMessage(error) });
+    }
+    setLoading(false);
+  }
+
+  return (
+    <Button type="button" variant="outline" className="w-full" disabled={loading} onClick={onResend}>
+      {loading ? "Sending..." : "Send a new code"}
+    </Button>
+  );
+}
+
 function FooterLink({ text, to, children }) {
   return (
     <p className="text-sm text-hint">
@@ -136,7 +166,7 @@ export function LoginPage() {
   }
 
   return (
-    <FormCard title="Log in" description="Businesses, CAs and admins all log in here">
+    <FormCard title="Log in">
       <Notice>{notice}</Notice>
       <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         <EmailField form={form} />
@@ -226,9 +256,7 @@ export function SignupPage() {
   }
 
   return (
-    <FormCard
-      title="Create an account"
-      description="For businesses, freelancers and Chartered Accountants">
+    <FormCard title="Create an account">
         
       <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         
@@ -282,6 +310,178 @@ export function SignupPage() {
     </FormCard>
   );
 }
+
+const verifySchema = z.object({ email: emailSchema, code: otpSchema });
+
+export function VerifyEmailPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [message, setMessage] = useState({});
+  const form = useZodForm(verifySchema, { email: location.state?.email ?? "", code: "" });
+
+  async function onSubmit({ email, code }) {
+    setMessage({});
+    try 
+    {
+      await verifyEmail(email, code);
+
+      navigate("/login", {
+        state: { email, notice: "Your email is verified, You can log in now" },
+      });
+    } 
+    catch (error) 
+    {
+      if (error instanceof ApiRequestError && error.code === "EMAIL_ALREADY_VERIFIED") 
+        navigate("/login", { state: { email, notice: "Your email is already verified, Log in" } });
+      
+      else 
+        setMessage({ error: errorMessage(error) });
+    }
+  }
+  return (
+    <FormCard
+      title="Verify your email"
+      description="Enter the 6 digit code we emailed you"
+    >
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        <EmailField form={form} />
+        
+        <FormField
+          label="Code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          {...field(form, "code")}
+        />
+
+        <ErrorText>{message.error}</ErrorText>
+        
+        <Notice>{message.notice}</Notice>
+        
+        <SubmitButton form={form} busyText="Verifying...">
+          Verify email
+        </SubmitButton>
+        
+        <ResendButton form={form} send={resendVerificationCode} setMessage={setMessage} />
+      </form>
+      
+      <FooterLink text="Already verified?" to="/login">
+        Log in
+      </FooterLink>
+    </FormCard>
+  );
+}
+
+const forgotSchema = z.object({ email: emailSchema });
+
+export function ForgotPasswordPage() {
+  const navigate = useNavigate();
+  const [serverError, setServerError] = useState(null);
+  const form = useZodForm(forgotSchema);
+
+  async function onSubmit({ email }) 
+  {
+    setServerError(null);
+    try 
+    {
+      await forgotPassword(email);
+      navigate("/reset-password", { state: { email } });
+    } 
+    catch (error) 
+    {
+      setServerError(errorMessage(error));
+    }
+  }
+
+  return (
+    <FormCard
+      title="Forgot your password?"
+      description="Enter your account email and we will send you a 6 digit code to reset it"
+    >
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        
+        <EmailField form={form} />
+        
+        <ErrorText>{serverError}</ErrorText>
+        
+        <SubmitButton form={form} busyText="Sending...">
+          Send code
+        </SubmitButton>
+      </form>
+      
+      <FooterLink text="Remembered it?" to="/login">
+        Log in
+      </FooterLink>
+    </FormCard>
+  );
+}
+
+const resetSchema = z
+  .object({
+    email: emailSchema,
+    code: otpSchema,
+    password: newPasswordSchema,
+    confirm_password: z.string(),
+  })
+  .refine(passwordsMatch, PASSWORDS_MATCH_ERROR);
+
+
+export function ResetPasswordPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [message, setMessage] = useState({});
+  const form = useZodForm(resetSchema, { email: location.state?.email ?? "" });
+
+  async function onSubmit({ email, code, password }) 
+  {
+    setMessage({});
+
+    try 
+    {
+      await resetPassword(email, code, password);
+      navigate("/login", {
+        state: { email, notice: "Your password is reset, Log in with your new password" },
+      });
+    } 
+    catch (error) 
+    {
+      setMessage({ error: errorMessage(error) });
+    }
+  }
+
+  return (
+    <FormCard
+      title="Reset your password"
+      description="We sent a 6 digit code to your email. Enter it and choose a new password."
+    >
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        <EmailField form={form} />
+       
+        <FormField
+          label="Code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          {...field(form, "code")}
+        />
+
+        <NewPasswordFields form={form} title="New password" />
+        
+        <ErrorText>{message.error}</ErrorText>
+        
+        <Notice>{message.notice}</Notice>
+        
+        <SubmitButton form={form} busyText="Saving...">
+          Reset password
+        </SubmitButton>
+        
+        <ResendButton form={form} send={forgotPassword} setMessage={setMessage} />
+      </form>
+      <FooterLink to="/login">Back to log in</FooterLink>
+    </FormCard>
+  );
+}
+
 
 const AUDIENCES = [
   {

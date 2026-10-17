@@ -6,6 +6,9 @@ import {
   LoginPage, 
   HomePage,   
   SignupPage,
+  VerifyEmailPage,
+  ForgotPasswordPage,
+  ResetPasswordPage,
 } from "@/pages/AuthPages";
 
 export const appRoutes = [
@@ -18,6 +21,9 @@ export const appRoutes = [
       { path: "login", element: <LoginPage /> },
       { index: true, element: <HomePage /> },
       { path: "signup", element: <SignupPage /> },
+      { path: "verify-email", element: <VerifyEmailPage /> },
+      { path: "forgot-password", element: <ForgotPasswordPage /> },
+      { path: "reset-password", element: <ResetPasswordPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },
