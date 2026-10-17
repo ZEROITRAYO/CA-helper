@@ -66,3 +66,4 @@ def health():
         return jsonify({"status": "bad", "database": "unavailable"}), 503
 
 import routes_auth
+import routes_business

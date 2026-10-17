@@ -1,7 +1,16 @@
 import re
 
-from helpers import (error, format_inr, gstin_error, read_amount, state_code, now)
-from models import (RuleThreshold, db_now)
+from flask import jsonify, request
+
+import ocr
+from app import app
+from filings import sync_filings
+from helpers import (
+    GST_STATES, current_user, error, format_inr, gstin_error, iso, money, my_business, read_amount,
+    read_upload, role_required, state_code, now,
+)
+from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now
+
 
 ENTITY_TYPES = ("individual", "proprietorship", "partnership", "llp", "private_limited")
 COMPANY_TYPES = ("llp", "private_limited")
@@ -104,6 +113,7 @@ def compute_profile(business):
         gst_scheme = "composition"
     elif business.gst_qrmp and turnover <= limit("gst.qrmp.max_turnover"):
         gst_scheme = "regular_qrmp"  
+    else:
         gst_scheme = "regular_monthly"
 
     presumptive = entity not in COMPANY_TYPES and turnover <= limit("itr.presumptive_44ad.max_turnover")
@@ -137,3 +147,118 @@ def compute_profile(business):
             "files_24q": business.deducts_tds and business.pays_salary_above_limit,
             "files_26q": business.deducts_tds, "roc_not_tracked": entity in COMPANY_TYPES,
             "explanations": explanations, "rule_version": "v2", "computed_at": db_now()}
+
+def business_page(business):
+    fields = ("legal_name", "entity_type", "state", "address", "description", "pan", "phone", "gst_registered",
+              "gstin", "gst_composition", "gst_qrmp", "accounts_audited_other_law", "deducts_tds", "tan",
+              "pays_salary_above_limit", "cin_llpin", "udyam_number")
+    info = {"id": str(business.id), "annual_turnover": money(business.annual_turnover),
+            "investment_amount": money(business.investment_amount),
+            "state_needs_review": state_code(business.state) is None}  
+    for field in fields:
+        info[field] = getattr(business, field)
+    profile = RegulatoryProfile.query.filter_by(business_id=business.id).first()
+    profile_info = None
+    if profile:
+        profile_info = {"gst_registration_suggested": profile.gst_registration_suggested,
+                        "roc_not_tracked": profile.roc_not_tracked, "explanations": profile.explanations,
+                        "rule_version": profile.rule_version, "computed_at": iso(profile.computed_at)}
+        for line in PROFILE_LINES:
+            profile_info[line] = getattr(profile, line)
+    nic = db.session.get(NicCode, business.nic_code_id) if business.nic_code_id else None
+    nic_info = {"code": nic.code, "description": nic.description} if nic else None
+    return {"business": info, "profile": profile_info, "nic_code": nic_info}
+
+@app.route("/api/v1/onboarding/business", methods=["POST"])
+@role_required("business")
+def register_business():
+    values, problem = read_business_form(request.get_json(silent=True) or {})
+    if problem:
+        return problem
+    if my_business():
+        return error(409, "BUSINESS_EXISTS", "Business already registered.")
+    business = Business(user_id=current_user().id, **values)
+    db.session.add(business)
+    db.session.flush()
+    profile = RegulatoryProfile(business_id=business.id, **compute_profile(business))
+    db.session.add(profile)
+    sync_filings(business.id, profile, now()) 
+    db.session.commit()
+    return jsonify(business_page(business)), 201
+
+@app.route("/api/v1/onboarding/business", methods=["GET"])
+@role_required("business")
+def get_business():
+    business = my_business()
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first.")
+    return jsonify(business_page(business))
+
+@app.route("/api/v1/onboarding/business", methods=["PUT"])
+@role_required("business")
+def update_business():
+    business = my_business()
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first.")
+    values, problem = read_business_form(request.get_json(silent=True) or {})
+    if problem:
+        return problem
+    for field in values:
+        setattr(business, field, values[field])
+    profile = RegulatoryProfile.query.filter_by(business_id=business.id).first()
+    old = {line: getattr(profile, line) for line in PROFILE_LINES}
+    new = compute_profile(business)
+    for field in new:
+        setattr(profile, field, new[field])
+    filings = sync_filings(business.id, profile, now())
+    db.session.commit()
+    changed = []
+    for line in PROFILE_LINES:
+        if old[line] != new[line]:
+            changed.append({"line": line, "old": old[line], "new": new[line]})
+    page = business_page(business)
+    page["changes"] = {"profile": changed, "filings": filings}
+    return jsonify(page)
+
+@app.route("/api/v1/onboarding/states")
+@role_required("business")
+def list_states():
+    return jsonify([{"name": state["name"], "code": state["code"]} for state in GST_STATES])
+
+@app.route("/api/v1/onboarding/nic-codes")
+@role_required("business")
+def search_nic_codes():
+    words = request.args.get("q", "").strip()[:100]
+    if len(words) < 2:
+        return jsonify([])
+    pattern = f"%{words}%"
+    codes = (NicCode.query.filter(NicCode.code.ilike(pattern) | NicCode.description.ilike(pattern))
+             .order_by(NicCode.code).limit(20))
+    return jsonify([{"code": nic.code, "description": nic.description} for nic in codes])
+
+@app.route("/api/v1/onboarding/business/nic-code", methods=["PUT"])
+@role_required("business")
+def set_nic_code():
+    business = my_business()
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first.")
+    code = str((request.get_json(silent=True) or {}).get("code") or "").strip()
+    nic = NicCode.query.filter_by(code=code).first()
+    if nic is None:
+        return error(422, "UNKNOWN_NIC_CODE", "Choose a appropriate code from the given NIC list.")
+    business.nic_code_id = nic.id
+    db.session.commit()
+    return jsonify({"code": nic.code, "description": nic.description})
+
+
+@app.route("/api/v1/onboarding/autofill", methods=["POST"])
+@role_required("business")
+def autofill():
+    upload, data, problem = read_upload()
+    if problem:
+        return problem
+    try:
+        text = ocr.extract_text(data, upload.mimetype)
+    except ValueError as reason:
+        return error(422, "DOCUMENT_UNREADABLE", f"File Unreadable. {reason}")
+    return jsonify({"found!": ocr.read_registration(text)})
