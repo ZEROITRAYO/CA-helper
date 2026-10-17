@@ -121,3 +121,38 @@ export function resetPassword(email, code, newPassword) {
     body: { email, code, new_password: newPassword },
   });
 }
+
+
+
+
+
+export const SETTINGS_KEY = ["auth", "settings"];
+
+export function useSettings() {
+  return useGet(SETTINGS_KEY, "/api/v1/auth/settings");
+}
+
+
+export function saveSettings(emailNotifications) {
+
+  return apiFetch("/api/v1/auth/settings", {
+    method: "PUT",
+    body: { email_notifications: emailNotifications },
+  });
+
+}
+
+
+
+
+
+
+export const NOTIFICATIONS_KEY = ["alerts", "notifications"];
+
+export function useNotifications(page) {
+  return useGet([...NOTIFICATIONS_KEY, page], `/api/v1/alerts/notifications?page=${page}`);
+}
+
+export function markNotificationRead(notificationId) {
+  return apiFetch(`/api/v1/alerts/notifications/${notificationId}/read`, { method: "POST" });
+}

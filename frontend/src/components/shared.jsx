@@ -1,4 +1,6 @@
+import { errorMessage } from "@/api";
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -8,6 +10,35 @@ import {
   Label, 
 } from "@/components/ui";
 import { cn } from "@/lib"; 
+import { useState } from "react";
+
+
+
+export function useAction() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function run(action) {
+    setError(null);
+    setBusy(true);
+
+
+    try {
+      await action();
+      return true;
+    } catch (failure) {
+      setError(errorMessage(failure));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { busy, error, setError, run };
+}
+
+
+
 
 export function ErrorText({ children, className }) {
   if (!children) return null;
@@ -26,6 +57,19 @@ export function Notice({ children }) {
     </p>
   );
 }
+
+export function QueryStatus({ query }) {
+  const queries = [].concat(query);
+
+  if (queries.some((one) => one.isPending)) {
+    return <p className="text-sm text-hint">Loading...</p>;
+  }
+
+  const failed = queries.find((one) => one.isError);
+  return failed ? <ErrorText>{errorMessage(failed.error)}</ErrorText> : null;
+}
+
+
 
 export function Section({ title, description, contentClassName, children, ...cardProps }) {
   return (
@@ -62,6 +106,33 @@ export function FormField({ id, label, error, hint, ...inputProps }) {
 export function field(form, name) {
   return { id: name, error: form.formState.errors[name], ...form.register(name) };
 }
+
+
+export function Pager({ data, onPage }) {
+
+  const pages = Math.max(1, Math.ceil(data.total / data.page_size));
+
+  if (pages === 1) return null;
+
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <Button variant="outline" disabled={data.page <= 1} onClick={() => onPage(data.page - 1)}>
+        Previous
+      </Button>
+
+      <span>
+        Page {data.page} of {pages}
+      </span>
+
+      <Button variant="outline" disabled={data.page >= pages} onClick={() => onPage(data.page + 1)}>
+        Next
+      </Button>
+    </div>
+  );
+}
+
+
+
 
 export function FormCard({ title, description, children }) {
   return (
