@@ -103,3 +103,21 @@ export function signup({ full_name, email, password, role }) {
     body: { full_name, email, password, role, terms_accepted: true },
   });
 }
+
+export function verifyEmail(email, code) {
+  return apiFetch("/api/v1/auth/verify-email", { method: "POST", body: { email, code } });
+}
+
+export function resendVerificationCode(email) {
+  return apiFetch("/api/v1/auth/verify-email/resend", { method: "POST", body: { email } });
+}
+
+export function forgotPassword(email) {
+  return apiFetch("/api/v1/auth/forgot-password", { method: "POST", body: { email } });
+}
+
+export function resetPassword(email, code, newPassword) {
+  return apiFetch("/api/v1/auth/reset-password", { method: "POST",
+    body: { email, code, new_password: newPassword },
+  });
+}
