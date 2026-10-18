@@ -4,12 +4,12 @@ from flask import jsonify, request
 
 import ocr
 from app import app
-from filings import sync_filings
+from filings import sync_filings, DONE, filing_to_dict
 from helpers import (
     GST_STATES, current_user, error, format_inr, gstin_error, iso, money, my_business, read_amount,
     read_upload, role_required, state_code, now,
 )
-from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now
+from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now, ComplianceItem
 
 
 ENTITY_TYPES = ("individual", "proprietorship", "partnership", "llp", "private_limited")
@@ -262,3 +262,72 @@ def autofill():
     except ValueError as reason:
         return error(422, "DOCUMENT_UNREADABLE", f"File Unreadable. {reason}")
     return jsonify({"found!": ocr.read_registration(text)})
+
+
+@app.route("/api/v1/compliance/dashboard")
+@role_required("business")
+def dashboard():
+    business = Business.query.filter_by(user_id=current_user().id).first()
+    today = now()
+    
+    if business is None:
+        return jsonify({
+            "message": f"Welcome, {current_user().full_name}",
+            "registered": False,
+            "next_deadline": None,
+            "due_this_month": 0,
+            "overdue": 0,
+            "with_ca": 0
+        })
+
+    overdue = 0
+    due_this_month = 0
+    with_ca = 0
+    next_deadline = None
+
+    filings = ComplianceItem.query.filter_by( business_id=business.id).order_by(ComplianceItem.due_date).all()
+    
+    for filing in filings: 
+        
+        if filing.status in DONE:
+            continue
+        
+        if filing.due_date < today:
+            overdue += 1
+        
+        else:
+            if next_deadline is None:
+                next_deadline = filing_to_dict(filing)
+
+            if (filing.due_date.year == today.year and filing.due_date.month == today.month):
+                due_this_month += 1
+        
+        if filing.status == "with_ca":
+            with_ca += 1
+
+    return jsonify({
+        "message": f"Welcome, {current_user().full_name}",
+        "registered": True,
+        "next_deadline": next_deadline,
+        "due_this_month": due_this_month,
+        "overdue": overdue,
+        "with_ca": with_ca
+    })
+
+
+@app.route("/api/v1/compliance/items")
+@role_required("business")
+def list_filings():
+    business = Business.query.filter_by(user_id=current_user().id).first()
+
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first")
+    
+    filings = ComplianceItem.query.filter_by(business_id=business.id).order_by(ComplianceItem.due_date).all()
+
+    result = []
+    
+    for filing in filings:
+        result.append(filing_to_dict(filing))
+
+    return jsonify(result)

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui";
 import { cn } from "@/lib"; 
 import { useState } from "react";
-
+import { Link } from "react-router";
 
 
 export function useAction() {
@@ -132,8 +132,6 @@ export function Pager({ data, onPage }) {
 }
 
 
-
-
 export function FormCard({ title, description, children }) {
   return (
     <Card className="mx-auto max-w-sm">
@@ -147,3 +145,59 @@ export function FormCard({ title, description, children }) {
     </Card>
   );
 }
+
+export function Welcome({ query }) {
+  let title = "Loading...";
+  
+  if (query.isError) title = "Dashboard";
+  
+  if (query.isSuccess) title = query.data.message;
+  
+  return (
+    <>
+      <h1 className="text-2xl font-semibold">{title}</h1>
+      
+      {query.isError && (
+        <Section title="Could not load the dashboard" description={errorMessage(query.error)} />
+      )}
+
+    </>
+  );
+}
+
+
+export function NumberCard({ title, value, note, alert, children }) {
+  
+  return (
+    <Card className={alert ? "ring-red-300" : undefined}>
+      <CardHeader>
+        
+        <CardDescription>{title}</CardDescription>
+        
+        <CardTitle className={cn("text-2xl tabular-nums", alert && "text-red-700")}>{value}</CardTitle>
+        
+        {note && <p className="text-xs text-hint">{note}</p>}
+        
+        {children}
+      
+      </CardHeader>
+    </Card>
+  );
+}
+
+export function RegisterFirst({ children }) {
+ 
+  return (
+    <p className="text-sm">
+      
+      <Link to="/business/onboarding" className="underline">
+        Register your business
+      </Link>
+
+      {" "}{children}
+
+    </p>
+  );
+}
+
+
