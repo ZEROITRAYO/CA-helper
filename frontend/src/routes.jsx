@@ -16,7 +16,7 @@ import {
 
 
 import { SettingsPage } from "@/pages/SettingsPage";
-
+import { BusinessDashboardPage } from "@/pages/business/DashboardPage";
 
 
 export const NAV = {
@@ -77,6 +77,7 @@ export const appRoutes = [
   
   roleArea("business", [
     { path: "settings", element: <SettingsPage /> },
+    { index: true, element: <BusinessDashboardPage /> },  
   ]),
 
   roleArea("ca", [
