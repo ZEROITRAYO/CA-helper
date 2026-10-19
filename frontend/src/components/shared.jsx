@@ -1,17 +1,10 @@
 import { errorMessage } from "@/api";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label, 
-} from "@/components/ui";
-import { cn } from "@/lib"; 
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label} from "@/components/ui";
+import { cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
 import { useState } from "react";
 import { Link } from "react-router";
+
+
 
 
 export function useAction() {
@@ -200,4 +193,63 @@ export function RegisterFirst({ children }) {
   );
 }
 
+
+
+
+
+export function Table({ headers, children }) {
+  return (
+    <div className="overflow-x-auto">
+
+      <table className="w-full text-left text-sm">
+
+        <thead className="border-b text-hint">
+          <tr>
+            {headers.map((header, index) => (
+              <th key={index} className={cn("py-2 font-medium", index < headers.length - 1 && "pr-4")}>{header}</th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>{children}</tbody>
+
+      </table>
+
+    </div>
+  );
+}
+
+
+
+export function Row({ cells }) {
+  return (
+
+    <tr className="border-b align-top">
+      {cells.map((cell, index) => (
+        <td key={index} className={cn("py-2", index < cells.length - 1 && "pr-4")}> {cell} </td>
+      ))}
+    </tr>
+  );
+}
+
+
+
+const COLOURS = {
+  overdue: "bg-red-100 text-red-900",
+  docs_pending: "bg-amber-100 text-amber-900",
+  ready: "bg-sky-100 text-sky-900",
+  with_ca: "bg-violet-100 text-violet-900",
+  filed: "bg-green-100 text-green-900",
+  filed_verified: "bg-green-100 text-green-900",
+};
+
+
+
+export function StatusBadge({ status }) {
+  return (
+    <Badge variant="secondary" className={COLOURS[status]}>
+      {label(COMPLIANCE_STATUS_LABELS, status)}
+    </Badge>
+  );
+}
 

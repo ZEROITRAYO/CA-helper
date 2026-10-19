@@ -103,6 +103,20 @@ export function filingFormLabel(formCode) {
   return label(FORM_LABELS, formCode);
 }
 
+
+
+export const COMPLIANCE_STATUS_LABELS = {
+  upcoming: "Upcoming",
+  docs_pending: "Docs pending",
+  ready: "Ready",
+  with_ca: "With CA",
+  filed: "Filed",
+  filed_verified: "Filed–verified",
+  overdue: "Overdue",
+};
+
+
+
 export function todayDate() {
   const today = new Date();
 
@@ -127,6 +141,8 @@ export function daysUntil(date) {
   return Math.round(milliseconds / (24 * 60 * 60 * 1000));
 }
 
+
+
 export function daysLeftText(date) {
   
   const days = daysUntil(date);
@@ -140,4 +156,18 @@ export function daysLeftText(date) {
   if (days === -1) return "1 day ago";
   
   return -1 * days + " days ago";
+}
+
+
+
+
+
+export function monthLabel(isoDate) {
+  const [year, month] = isoDate.split("-").map(Number);
+
+  return new Date(year, month - 1, 1).toLocaleDateString("en-IN", {
+    month: "long",
+    year: "numeric",
+  });
+
 }
