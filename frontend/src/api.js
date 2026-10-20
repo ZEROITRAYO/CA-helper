@@ -123,9 +123,6 @@ export function resetPassword(email, code, newPassword) {
 }
 
 
-
-
-
 export const SETTINGS_KEY = ["auth", "settings"];
 
 export function useSettings() {
@@ -189,3 +186,14 @@ export function markNotificationRead(notificationId) {
 }
 
 export const FILINGS_KEY = ["compliance", "items"];
+export const DASHBOARD_KEY = ["compliance", "dashboard"];
+
+export function useComplianceDashboard() 
+{
+  return useGet(DASHBOARD_KEY, "/api/v1/compliance/dashboard");
+}
+
+export function useFilings() 
+{
+  return useGet(FILINGS_KEY, "/api/v1/compliance/items", { notFound: "BUSINESS_NOT_FOUND" });
+}

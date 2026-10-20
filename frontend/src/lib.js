@@ -153,4 +153,85 @@ export function gstinError(gstin, pan, stateName, stateCode) {
     return "PAN inside this GSTIN (characters 3 to 12) does not match your PAN.";
   }
   return null;
+export const FORM_LABELS = {
+  itr: "Income tax return (ITR)",
+  gstr_1: "GSTR-1",
+  gstr_3b: "GSTR-3B",
+  cmp_08: "CMP-08",
+  gstr_4: "GSTR-4",
+  tds_24q: "TDS return 24Q (salaries)",
+  tds_26q: "TDS return 26Q (other payments)",
+};
+
+export function filingFormLabel(formCode) {
+  return label(FORM_LABELS, formCode);
+}
+
+
+
+export const COMPLIANCE_STATUS_LABELS = {
+  upcoming: "Upcoming",
+  docs_pending: "Docs pending",
+  ready: "Ready",
+  with_ca: "With CA",
+  filed: "Filed",
+  filed_verified: "Filed–verified",
+  overdue: "Overdue",
+};
+
+
+
+export function todayDate() {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+
+export function daysUntil(date) {
+  
+  const [year, month, day] = date.split("-").map(Number);
+  
+  const [nowYear, nowMonth, nowDay] = todayDate().split("-").map(Number);
+  
+  const milliseconds = Date.UTC(year, month - 1, day) - Date.UTC(nowYear, nowMonth - 1, nowDay);
+  
+  return Math.round(milliseconds / (24 * 60 * 60 * 1000));
+}
+
+
+
+export function daysLeftText(date) {
+  
+  const days = daysUntil(date);
+  
+  if (days === 0) return "Today";
+  
+  if (days === 1) return "In 1 day";
+  
+  if (days > 1) return "In " + days + " days";
+  
+  if (days === -1) return "1 day ago";
+  
+  return -1 * days + " days ago";
+}
+
+
+
+
+
+export function monthLabel(isoDate) {
+  const [year, month] = isoDate.split("-").map(Number);
+
+  return new Date(year, month - 1, 1).toLocaleDateString("en-IN", {
+    month: "long",
+    year: "numeric",
+  });
+
 }

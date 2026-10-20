@@ -1,9 +1,27 @@
 import sys
 from datetime import date
 from decimal import Decimal
-
 from app import app
-from models import ObligationTemplate, RuleThreshold, db
+from filings import sync_filings
+from helpers import now
+from models import CatalogService, ObligationTemplate, PenaltyRule, RegulatoryProfile, RuleThreshold, db
+
+
+SERVICE_CATALOG = [ 
+    ("itr_presumptive", "ITR filing: presumptive income (ITR-4)", "Income tax return for a business or profession on presumptive income.", "per_return"),
+    ("itr_business", "ITR filing: business or profession (ITR-3)", "Income tax return for a proprietor or professional with business income.", "per_return"),
+    ("itr_firm_company", "ITR filing: firm, LLP or company (ITR-5 / ITR-6)", "Income tax return for a partnership firm, LLP or company.", "per_return"),
+    ("gstr_1", "GSTR-1 filing", "Return of outward supplies (sales).", "per_return"),
+    ("gstr_3b", "GSTR-3B filing", "Summary GST return with tax payment.", "per_return"),
+    ("cmp_08", "CMP-08 filing", "Statement for composition-scheme taxpayers.", "per_return"),
+    ("gstr_4", "GSTR-4 filing", "Annual return for composition-scheme taxpayers.", "per_return"),
+    ("tds_24q", "TDS return 24Q", "TDS return for tax deducted on salaries.", "per_return"),
+    ("tds_26q", "TDS return 26Q", "TDS return for tax deducted on other payments.", "per_return"),
+    ("gst_registration", "GST registration", "Getting a new GST registration.", "one_time"),
+    ("tax_audit", "Tax audit", "Tax audit of the accounts for one financial year.", "per_year"),
+    ("bookkeeping", "Bookkeeping", "Keeping the books of accounts up to date.", "per_month"),
+    ("income_tax_notice", "Reply to an income-tax notice", "Reading an income-tax notice and preparing the reply.", "per_notice"),
+]
 
 RULES_FROM = date(2025, 4, 1)
 
@@ -70,16 +88,86 @@ OBLIGATION_TEMPLATES = [
      "incometax.gov.in, Form 140 (earlier 26Q) user manual: 31 July, 31 October, 31 January, 31 May; shown as Form 140 from tax year 2026-27 (Income-tax Act 2025 s.393 and Income-tax Rules 2026; filings.RENAMED_FORMS)"),
 ]
 
+
+GST_LATE_FEE = "CBIC Circular 26/26/2017-GST: ₹50 a day (₹25 CGST + ₹25 SGST), nil ₹20"
+GST_INTEREST = "TODO_VERIFY: interest 18% a year (CGST Act s.50, Notification 13/2017-CT; not read)"
+
+PENALTY_RULES = [
+    ("gstr_1", {"late_fee_per_day": "50", "max_late_fee": "2000", "annual_interest_rate": "0"},
+        "TODO_VERIFY: ₹50/₹20 a day as for GSTR-3B (Notification 4/2018-CT; not read). Cap: "
+        "Notification 20/2021-CT, CGST ₹1,000 up to ₹1.5 crore (₹250 nil, ₹2,500 up to "
+        "₹5 crore), doubled for SGST. No tax is paid with GSTR-1, so no interest.",
+    ),
+
+    ("gstr_3b", {"late_fee_per_day": "50", "max_late_fee": "2000", "annual_interest_rate": "18"},
+        f"{GST_LATE_FEE}. Cap: Notification 19/2021-CT, CGST ₹1,000 up to ₹1.5 crore (₹250 "
+        f"nil, ₹2,500 up to ₹5 crore), doubled for SGST. {GST_INTEREST}",
+    ),
+
+    ("cmp_08", {"late_fee_per_day": "0", "max_late_fee": "0", "annual_interest_rate": "18"},
+        f"GST portal FAQ 'Filing Form GST CMP-08' Q9: no late fee. {GST_INTEREST}",
+    ),
+
+    ("gstr_4", {"late_fee_per_day": "50", "max_late_fee": "2000", "annual_interest_rate": "18"},
+        "TODO_VERIFY: ₹50/₹20 a day (Notification 73/2017-CT; not read). Cap: Notification "
+        f"21/2021-CT, CGST ₹1,000 (₹250 nil), doubled for SGST. {GST_INTEREST}",
+    ),
+
+    ("tds_24q", {"late_fee_per_day": "200", "annual_interest_rate": "0"},
+        "TRACES FAQ on late filing fee (tdscpc.gov.in): ₹200 a day (s.234E), at most the TDS "
+        "of the statement (not stored). A late statement has no interest (that is for late "
+        "deposit).",
+    ),
+
+    ("tds_26q", {"late_fee_per_day": "200", "annual_interest_rate": "0"},
+        "TRACES FAQ on late filing fee (tdscpc.gov.in): ₹200 a day (s.234E), at most the TDS "
+        "of the statement (not stored). A late statement has no interest (that is for late "
+        "deposit).",
+    ),
+
+    ("itr", {"flat_late_fee": "5000", "annual_interest_rate": "12"},
+        "incometax.gov.in, Income Tax Returns FAQ Q25: ₹5,000 (₹1,000 when income is at most "
+        "₹5 lakh; s.234F, s.428 of the 2025 Act). TODO_VERIFY: interest 1% a month (s.234A; "
+        "not read).",
+    ),
+]
+
+
 def save(table, lookup, values):
+
     row = table.query.filter_by(**lookup).first()
+
     if row is None:
         row = table(**lookup)
         db.session.add(row)
+
     for column, value in values.items():
         setattr(row, column, value)
 
 
 def seed():
+
+    for order, (code, name, description, unit) in enumerate(SERVICE_CATALOG, start=1):
+        form_code = (
+            "itr" if code.startswith("itr_")
+            else code if code in {
+                "gstr_1", "gstr_3b", "cmp_08", "gstr_4", "tds_24q", "tds_26q"
+            }
+            else None
+        )
+
+        save(
+            CatalogService,
+            {"code": code},
+            {
+                "name": name,
+                "description": description,
+                "unit": unit,
+                "sort_order": order,
+                "form_code": form_code,
+            },
+        )
+
     for key, value, unit, description, source in RULE_THRESHOLDS:
         save(
             RuleThreshold,
@@ -92,14 +180,11 @@ def seed():
             },
         )
 
+
     for form, name, frequency, applicability, rule, source in OBLIGATION_TEMPLATES:
         save(
             ObligationTemplate,
-            {
-                "form_code": form,
-                "frequency": frequency,
-                "effective_from": RULES_FROM,
-            },
+            {"form_code": form, "frequency": frequency, "effective_from": RULES_FROM},
             {
                 "name": name,
                 "applicability": applicability,
@@ -108,8 +193,34 @@ def seed():
             },
         )
 
+    for form, amounts, source in PENALTY_RULES:
+        values = {
+            column: Decimal(amounts[column]) if column in amounts else None
+            for column in (
+                "late_fee_per_day",
+                "max_late_fee",
+                "flat_late_fee",
+                "annual_interest_rate",
+            )
+        }
+
+
+        values["source_reference"] = source
+        save(
+            PenaltyRule,
+            {"form_code": form, "effective_from": RULES_FROM},
+            values,
+        )
+
+    db.session.flush()
+
+    for profile in RegulatoryProfile.query.all():
+        sync_filings(profile.business_id, profile, now())
+
     db.session.commit()
-    print("Seeded: rule thresholds and obligation templates")
+    print("Seeded catalog, rules, and synced filings.")
+
+
 
 if __name__ == "__main__":
     with app.app_context():

@@ -10,7 +10,11 @@ import {
   Label, 
 } from "@/components/ui";
 import { cn, label } from "@/lib"; 
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label} from "@/components/ui";
+import { cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
 import { useState } from "react";
+import { Link } from "react-router";
+
 
 
 
@@ -132,8 +136,6 @@ export function Pager({ data, onPage }) {
 }
 
 
-
-
 export function FormCard({ title, description, children }) {
   return (
     <Card className="mx-auto max-w-sm">
@@ -154,6 +156,84 @@ export function Field({ id, label, error, className = "space-y-2", children }) {
       <Label htmlFor={id}>{label}</Label>
       {children}
       {error && <p className="text-sm text-danger">{error.message}</p>}
+       
+       
+export function Welcome({ query }) {
+  let title = "Loading...";
+  
+  if (query.isError) title = "Dashboard";
+  
+  if (query.isSuccess) title = query.data.message;
+  
+  return (
+    <>
+      <h1 className="text-2xl font-semibold">{title}</h1>
+      
+      {query.isError && (
+        <Section title="Could not load the dashboard" description={errorMessage(query.error)} />
+      )}
+
+    </>
+  );
+}
+
+
+export function NumberCard({ title, value, note, alert, children }) {
+  
+  return (
+    <Card className={alert ? "ring-red-300" : undefined}>
+      <CardHeader>
+        
+        <CardDescription>{title}</CardDescription>
+        
+        <CardTitle className={cn("text-2xl tabular-nums", alert && "text-red-700")}>{value}</CardTitle>
+        
+        {note && <p className="text-xs text-hint">{note}</p>}
+        
+        {children}
+      
+      </CardHeader>
+    </Card>
+  );
+}
+
+export function RegisterFirst({ children }) {
+ 
+  return (
+    <p className="text-sm">
+      
+      <Link to="/business/onboarding" className="underline">
+        Register your business
+      </Link>
+
+      {" "}{children}
+
+    </p>
+  );
+}
+
+
+
+
+
+export function Table({ headers, children }) {
+  return (
+    <div className="overflow-x-auto">
+
+      <table className="w-full text-left text-sm">
+
+        <thead className="border-b text-hint">
+          <tr>
+            {headers.map((header, index) => (
+              <th key={index} className={cn("py-2 font-medium", index < headers.length - 1 && "pr-4")}>{header}</th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>{children}</tbody>
+
+      </table>
+
     </div>
   );
 }
@@ -171,6 +251,7 @@ export function Options({ labels, codes = Object.keys(labels), empty }) {
   );
 }
 
+
 export function Choice({ id, type = "checkbox", text, ...inputProps }) {
   return (
     <label htmlFor={id} className="flex items-center gap-2 text-sm">
@@ -179,3 +260,37 @@ export function Choice({ id, type = "checkbox", text, ...inputProps }) {
     </label>
   );
 }
+
+
+export function Row({ cells }) {
+  return (
+
+    <tr className="border-b align-top">
+      {cells.map((cell, index) => (
+        <td key={index} className={cn("py-2", index < cells.length - 1 && "pr-4")}> {cell} </td>
+      ))}
+    </tr>
+  );
+}
+
+
+
+const COLOURS = {
+  overdue: "bg-red-100 text-red-900",
+  docs_pending: "bg-amber-100 text-amber-900",
+  ready: "bg-sky-100 text-sky-900",
+  with_ca: "bg-violet-100 text-violet-900",
+  filed: "bg-green-100 text-green-900",
+  filed_verified: "bg-green-100 text-green-900",
+};
+
+
+
+export function StatusBadge({ status }) {
+  return (
+    <Badge variant="secondary" className={COLOURS[status]}>
+      {label(COMPLIANCE_STATUS_LABELS, status)}
+    </Badge>
+  );
+}
+
