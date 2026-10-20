@@ -1,4 +1,15 @@
 import { errorMessage } from "@/api";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label, 
+} from "@/components/ui";
+import { cn, label } from "@/lib"; 
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label} from "@/components/ui";
 import { cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
 import { useState } from "react";
@@ -139,6 +150,14 @@ export function FormCard({ title, description, children }) {
   );
 }
 
+export function Field({ id, label, error, className = "space-y-2", children }) {
+  return (
+    <div className={className}>
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
+       
+       
 export function Welcome({ query }) {
   let title = "Loading...";
   
@@ -219,6 +238,28 @@ export function Table({ headers, children }) {
   );
 }
 
+export function Options({ labels, codes = Object.keys(labels), empty }) {
+  return (
+    <>
+      {empty !== undefined && <option value="">{empty}</option>}
+      {codes.map((code) => (
+        <option key={code} value={code}>
+          {label(labels, code)}
+        </option>
+      ))}
+    </>
+  );
+}
+
+
+export function Choice({ id, type = "checkbox", text, ...inputProps }) {
+  return (
+    <label htmlFor={id} className="flex items-center gap-2 text-sm">
+      <input id={id} type={type} {...inputProps} />
+      {text}
+    </label>
+  );
+}
 
 
 export function Row({ cells }) {

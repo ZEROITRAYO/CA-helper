@@ -260,8 +260,7 @@ def autofill():
     try:
         text = ocr.extract_text(data, upload.mimetype)
     except ValueError as reason:
-        return error(422, "DOCUMENT_UNREADABLE", f"File Unreadable. {reason}")
-      
+        return error(422, "DOCUMENT_UNREADABLE", f"File Unreadable. {reason}")  
     return jsonify({"found": ocr.read_registration(text)}) 
 
 
