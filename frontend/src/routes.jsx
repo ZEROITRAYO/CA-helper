@@ -1,21 +1,20 @@
 import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
+
 import { useAuth } from "@/auth";
 import { Button } from "@/components/ui";
 import { cn, ROLE_HOME, USER_ROLE_LABELS } from "@/lib";
-
 import {
-  NotFoundPage,
-  TermsPage,
-  LoginPage, 
-  HomePage,   
-  SignupPage,
-  VerifyEmailPage,
   ForgotPasswordPage,
+  HomePage,
+  LoginPage,
+  NotFoundPage,
   ResetPasswordPage,
+  SignupPage,
+  TermsPage,
+  VerifyEmailPage,
 } from "@/pages/AuthPages";
-
-
 import { SettingsPage } from "@/pages/SettingsPage";
+import { OnboardingPage } from "@/pages/business/OnboardingPage";
 
 
 
@@ -77,6 +76,7 @@ export const appRoutes = [
   
   roleArea("business", [
     { path: "settings", element: <SettingsPage /> },
+    { path: "onboarding", element: <OnboardingPage /> },
   ]),
 
   roleArea("ca", [

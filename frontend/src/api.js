@@ -143,7 +143,38 @@ export function saveSettings(emailNotifications) {
 }
 
 
+export const MY_BUSINESS_KEY = ["onboarding", "business"];
 
+
+export function useMyBusiness() {
+  return useGet(MY_BUSINESS_KEY, "/api/v1/onboarding/business", { notFound: "BUSINESS_NOT_FOUND" });
+}
+
+export function registerBusiness(form) {
+  return apiFetch("/api/v1/onboarding/business", { method: "POST", body: form });
+}
+
+export function updateBusiness(form) {
+  return apiFetch("/api/v1/onboarding/business", { method: "PUT", body: form });
+}
+
+export function useNicSearch(query) {
+  const text = query.trim();
+  const path = "/api/v1/onboarding/nic-codes?q=" + encodeURIComponent(text);
+  return useGet(["onboarding", "nic-codes", text], path, { enabled: text.length >= 2 });
+}
+
+export function saveNicCode(code) {
+  return apiFetch("/api/v1/onboarding/business/nic-code", { method: "PUT", body: { code } });
+}
+
+export function useGstStates() {
+  return useGet(["onboarding", "states"], "/api/v1/onboarding/states", { staleTime: Infinity });
+}
+
+export function readRegistrationDocument(file) {
+  return sendForm("/api/v1/onboarding/autofill", { file });
+}
 
 
 
@@ -156,3 +187,5 @@ export function useNotifications(page) {
 export function markNotificationRead(notificationId) {
   return apiFetch(`/api/v1/alerts/notifications/${notificationId}/read`, { method: "POST" });
 }
+
+export const FILINGS_KEY = ["compliance", "items"];

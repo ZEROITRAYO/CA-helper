@@ -9,7 +9,7 @@ import {
   Input,
   Label, 
 } from "@/components/ui";
-import { cn } from "@/lib"; 
+import { cn, label } from "@/lib"; 
 import { useState } from "react";
 
 
@@ -145,5 +145,37 @@ export function FormCard({ title, description, children }) {
       </CardHeader>
       <CardContent className="space-y-4">{children}</CardContent>
     </Card>
+  );
+}
+
+export function Field({ id, label, error, className = "space-y-2", children }) {
+  return (
+    <div className={className}>
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
+    </div>
+  );
+}
+
+export function Options({ labels, codes = Object.keys(labels), empty }) {
+  return (
+    <>
+      {empty !== undefined && <option value="">{empty}</option>}
+      {codes.map((code) => (
+        <option key={code} value={code}>
+          {label(labels, code)}
+        </option>
+      ))}
+    </>
+  );
+}
+
+export function Choice({ id, type = "checkbox", text, ...inputProps }) {
+  return (
+    <label htmlFor={id} className="flex items-center gap-2 text-sm">
+      <input id={id} type={type} {...inputProps} />
+      {text}
+    </label>
   );
 }
