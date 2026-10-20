@@ -153,6 +153,8 @@ export function gstinError(gstin, pan, stateName, stateCode) {
     return "PAN inside this GSTIN (characters 3 to 12) does not match your PAN.";
   }
   return null;
+}
+
 export const FORM_LABELS = {
   itr: "Income tax return (ITR)",
   gstr_1: "GSTR-1",
