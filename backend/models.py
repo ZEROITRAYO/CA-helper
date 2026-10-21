@@ -222,6 +222,7 @@ class CaProfile(Table):
     verified_at = db.Column(db.DateTime(timezone=True))
     verified_by_id = db.Column(db.Uuid, db.ForeignKey("users.id"))
     cop_document_id = db.Column(db.Uuid, db.ForeignKey("documents.id")) 
+    rejection_reason = db.Column(db.String(500))
 
 
 class CatalogService(Table):

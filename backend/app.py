@@ -67,3 +67,4 @@ def health():
 
 import routes_auth
 import routes_business
+import routes_marketplace
