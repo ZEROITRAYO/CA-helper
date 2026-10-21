@@ -11,6 +11,8 @@ from argon2 import PasswordHasher
 from models import Notification, db, Business
 from decimal import Decimal
 
+import uuid
+
 REPO = Path(__file__).resolve().parent.parent  
 
 
@@ -171,3 +173,10 @@ def read_upload():
     if len(data) > max_mb * 1024 * 1024:
         return None, None, error(400, "FILE_TOO_LARGE", f"The file is larger than {max_mb} MB!")
     return upload, data, None
+
+
+def as_uuid(value):
+    try:
+        return uuid.UUID(str(value))
+    except ValueError:
+        return None
