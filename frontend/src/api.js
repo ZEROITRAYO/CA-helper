@@ -197,3 +197,19 @@ export function useFilings()
 {
   return useGet(FILINGS_KEY, "/api/v1/compliance/items", { notFound: "BUSINESS_NOT_FOUND" });
 }
+
+
+export function filingKey(itemId) 
+{
+  return ["compliance", "item", itemId];
+}
+
+export function useFiling(itemId) 
+{
+  return useGet(filingKey(itemId), "/api/v1/compliance/items/" + itemId);
+}
+
+export function tickChecklist(itemId, key, ticked) 
+{
+  return apiFetch("/api/v1/compliance/items/" + itemId + "/checklist", { method: "POST", body: { key, ticked },});
+}

@@ -8,7 +8,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { BusinessDashboardPage } from "@/pages/business/DashboardPage";
 import { CompliancePage } from "@/pages/business/CalenderPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
-
+import { FilingPage } from "@/pages/business/FilingPage";
 
 
 
@@ -73,6 +73,7 @@ export const appRoutes = [
     { path: "onboarding", element: <OnboardingPage /> },
     { index: true, element: <BusinessDashboardPage /> },  
     { path: "compliance", element: <CompliancePage /> },
+    { path: "compliance/:itemId", element: <FilingPage /> },
   ]),
 
   roleArea("ca", [

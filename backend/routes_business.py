@@ -4,7 +4,7 @@ from flask import jsonify, request
 
 import ocr
 from app import app
-from filings import sync_filings, DONE, filing_to_dict
+from filings import sync_filings, DONE, filing_to_dict, filing_page, checklist, set_tick
 from helpers import (
     GST_STATES, current_user, error, format_inr, gstin_error, iso, money, my_business, read_amount,
     read_upload, role_required, state_code, now,
@@ -331,5 +331,69 @@ def list_filings():
     for filing in filings:
         result.append(filing_to_dict(filing))
 
+    return jsonify(result)
+
+
+def find_filing(item_id):
+    business = my_business()
+
+    if business is None:
+        return None, error(404, "BUSINESS_NOT_FOUND", "Register your business first")
+    
+    filing = db.session.get(ComplianceItem, item_id)
+    
+    if filing is None or filing.business_id != business.id:
+        return None, error(404, "FILING_NOT_FOUND", "This filing was not found")
+    
+    return filing, None
+
+
+@app.route("/api/v1/compliance/items/<uuid:item_id>")
+@role_required("business")
+def get_filing(item_id):
+    filing, problem = find_filing(item_id)
+
+    if problem:
+        return problem
+
+    result = filing_page(filing)
+    
+    return jsonify(result)
+
+
+@app.route("/api/v1/compliance/items/<uuid:item_id>/checklist", methods=["POST"])
+@role_required("business")
+def tick_checklist(item_id):
+    filing, problem = find_filing(item_id)
+
+    if problem:
+        return problem
+
+    data = request.get_json(silent=True)
+
+    if data is None:
+        data = {}
+
+    key = data.get("key")
+    entries = checklist(filing.form_code)
+    key_exists = False
+
+    for entry in entries:
+        if entry["key"] == key:
+            key_exists = True
+            break
+
+    if not key_exists:
+        return error(
+            422,
+            "UNKNOWN_CHECKLIST_KEY",
+            "This checklist entry does not exist"
+        )
+
+    set_tick(filing, key, data["ticked"])
+
+    db.session.commit()
+
+    result = filing_page(filing)
     return jsonify(result)
 
