@@ -1,5 +1,5 @@
 import { errorMessage } from "@/api";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label} from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, linkClass} from "@/components/ui";
 import { cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -285,4 +285,10 @@ export function StatusBadge({ status }) {
     </Badge>
   );
 }
+
+export function BackLink({ to, children }) 
+{
+  return ( <Link to={to} className={cn("text-sm", linkClass)}> {children} </Link> );
+}
+
 

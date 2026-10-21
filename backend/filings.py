@@ -1,9 +1,9 @@
 import calendar
 from datetime import date
 
-from helpers import iso
-from models import (ChecklistTick, ComplianceItem, ComplianceItemDocument, DocumentRequest, Engagement, EngagementItem, ObligationTemplate, ReminderLog, db)
-
+from helpers import iso, REPO, now
+from models import (ChecklistTick, ComplianceItem, ComplianceItemDocument, DocumentRequest, Engagement, EngagementItem, ObligationTemplate, ReminderLog, db, Document,)
+import json
 
 DONE = ("filed", "filed_verified")
 NOT_STARTED = ("upcoming", "docs_pending", "ready", "overdue")
@@ -190,4 +190,152 @@ def sync_filings(business_id, profile, today):
         counts["removed"] += 1
     return counts
 
+
+def checklist(form_code):
+    path = REPO / "content/forms" / FORM_FOLDERS[form_code] / "checklist.json"
+    entries = []
+
+    for item in json.loads(path.read_text()).get("items") or []:
+        entries.append({
+            "key": item["key"],
+            "label": item["label"],
+            "required": bool(item.get("required")),
+            "help": item.get("help")
+        })
+
+    return entries
+
+
+def form_content(form_code):
+    result = {
+        "form_code": form_code,
+        "status": "DONE",
+        "checklist": checklist(form_code)
+    }
+
+    for name in ("explanation", "instructions"):
+        page = json.loads((REPO / "content/forms" / FORM_FOLDERS[form_code] /f"{name}.json").read_text())
+
+        result[name] = page
+
+        status = page.get("status", "TODO")
+
+        if status == "TODO" or (status == "DRAFT" and result["status"] == "DONE"):
+            result["status"] = status
+
+    return result
+
+def checklist_with_ticks(filing):
+    ticked = [tick.checklist_key for tick in ChecklistTick.query.filter_by(compliance_item_id=filing.id)]
+
+    result = []
+
+    for entry in checklist(filing.form_code):
+        entry["ticked"] = entry["key"] in ticked
+        result.append(entry)
+
+    return result
+
+def missing_documents(filing):
+    return [item["label"] for item in checklist_with_ticks(filing) if item["required"] and not item["ticked"]]
+
+def refresh_status(filing):
+    if filing.status not in NOT_STARTED:
+        return
+    
+    if filing.due_date < now():
+        filing.status = "overdue"
+    
+    elif not any(entry["ticked"] for entry in checklist_with_ticks(filing)):
+        filing.status = "upcoming"
+    
+    elif missing_documents(filing):
+        filing.status = "docs_pending"
+    
+    else:
+        filing.status = "ready"
+
+def set_tick(filing, key, ticked):
+    tick = ChecklistTick.query.filter_by(compliance_item_id=filing.id, checklist_key=key).first()
+    
+    if ticked and tick is None:
+        db.session.add(ChecklistTick(compliance_item_id=filing.id, checklist_key=key))
+    
+    if not ticked and tick is not None:
+        db.session.delete(tick)
+    
+    db.session.flush()
+    refresh_status(filing)
+
+def filing_page(filing):
+    content = form_content(filing.form_code)
+    acknowledgement = None
+    
+    if filing.acknowledgement_document_id:
+        
+        document = db.session.get(Document, filing.acknowledgement_document_id)
+        
+        acknowledgement = {"filename": document.original_filename, "uploaded_at": iso(document.created_at),
+                           "verification": verify_acknowledgement(document, filing)}
+
+    name = db.session.get(ObligationTemplate, filing.template_id).name
+    
+    return {"filing": filing_to_dict(filing), "form_name": name, "content_status": content["status"],
+            "explanation": content["explanation"], "instructions": content["instructions"],
+            "checklist": checklist_with_ticks(filing), "acknowledgement": acknowledgement}
+
+
+
+def verify_acknowledgement(document, filing):
+    fields = document.ocr_fields or {}
+
+    number = fields.get("acknowledgement_no")
+    filed_on = fields.get("filing_date")
+    problems = []
+
+    if document.ocr_status != "processed":
+        error = fields.get("error")
+
+        if error:
+            problems.append(error)
+        
+        else:
+            problems.append("The file has not been read yet")
+
+    else:
+        if filing.form_code not in fields.get("form_codes", []): #form name checking
+            form = form_name(filing.form_code, filing.fy)
+            
+            problems.append(f"It does not name the form {form}")
+
+        #acknowledgement number checking
+        typed = filing.acknowledgement_no or ""
+        typed = typed.replace(" ", "").upper()
+
+        if number is None:
+            problems.append("No acknowledgement or ARN number was found")
+
+        elif typed and typed != number:
+            problems.append(
+                f"Ack number ({number}) is not the one typed ({typed})"
+            )
+
+        #filing date checking
+        if filed_on is None:
+            problems.append("No filing date was found")
+
+        else:
+            filing_date = date.fromisoformat(filed_on)
+
+            if filing_date < filing.period_end:
+                problems.append("Its date is before the end of the period")
+
+    result = {
+        "verified": len(problems) == 0,
+        "problems": problems,
+        "acknowledgement_no": number,
+        "filing_date": filed_on
+    }
+
+    return result
 
