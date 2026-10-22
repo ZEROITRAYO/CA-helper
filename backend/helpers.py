@@ -3,13 +3,17 @@ from datetime import datetime
 from functools import wraps
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from flask import jsonify, current_app, render_template, request
+from flask import jsonify, current_app, render_template, request, send_file
 from flask_jwt_extended import get_current_user, jwt_required
 import smtplib
 from email.message import EmailMessage
 from argon2 import PasswordHasher
-from models import Notification, db, Business
+from models import Notification, db, Business, ComplianceItemDocument, Document, DocumentRequest
 from decimal import Decimal
+import hashlib
+import io
+from cryptography.fernet import Fernet
+import ocr
 
 import uuid
 
@@ -180,3 +184,47 @@ def as_uuid(value):
         return uuid.UUID(str(value))
     except ValueError:
         return None
+
+    
+def save_document(owner_id, uploader_id, doc_type, upload, data):
+    fernet = Fernet(current_app.config["FIELD_ENCRYPTION_KEY"])
+   
+    document = Document(owner_id=owner_id, uploaded_by_id=uploader_id, doc_type=doc_type,
+                        original_filename=(upload.filename or "upload")[:255], mime_type=upload.mimetype,
+                        content=fernet.encrypt(data), size_bytes=len(data),
+                        sha256=hashlib.sha256(data).hexdigest())
+    
+    try:
+        text = ocr.extract_text(data, upload.mimetype)
+       
+        document.ocr_fields = ocr.read_proof_fields(text, now())
+       
+        document.ocr_status = "processed"
+      
+    except Exception:  
+        document.ocr_status, document.ocr_fields = "failed", {"error": "The file could not be read"}
+    
+    db.session.add(document)
+    
+    db.session.flush() 
+    
+    return document
+
+
+def send_document(document):
+    key = current_app.config["FIELD_ENCRYPTION_KEY"]
+
+    data = Fernet(key).decrypt(document.content)
+    
+    return send_file(io.BytesIO(data), mimetype=document.mime_type, download_name=document.original_filename)
+
+
+def remove_document(document_id):
+    ComplianceItemDocument.query.filter_by(document_id=document_id).delete()
+    
+    DocumentRequest.query.filter_by(document_id=document_id).update({"document_id": None})
+    
+    document = db.session.get(Document, document_id)
+    
+    if document:
+        db.session.delete(document)
