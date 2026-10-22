@@ -3,7 +3,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-
+from datetime import date
 import pymupdf
 
 
@@ -100,3 +100,121 @@ def read_registration(text):
             if words in clean:
                 found["entity_type"] = entity_type  
     return found
+
+MONTHS = {
+    "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4, "MAY": 5, "JUNE": 6, "JULY": 7,
+    "AUGUST": 8, "SEPTEMBER": 9, "OCTOBER": 10, "NOVEMBER": 11, "DECEMBER": 12,
+    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9,
+    "SEPT": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+}  
+
+FORM_PATTERNS = {
+    "gstr_3b": re.compile(r"\bGSTR\s*-?\s*3B\b"),
+    "gstr_1": re.compile(r"\bGSTR\s*-?\s*1\b"),
+    "cmp_08": re.compile(r"\bCMP\s*-?\s*0?8\b"),
+    "gstr_4": re.compile(r"\bGSTR\s*-?\s*4\b"),
+    "tds_24q": re.compile(r"\b24\s*Q\b"),
+    "tds_26q": re.compile(r"\b26\s*Q\b"),
+    "itr": re.compile(r"\bITR\s*-?\s*(?:[1-7]|V)?\b|\bINCOME\s*TAX\s*RETURN\b"),
+}
+
+ACK_NUMBER = re.compile(
+    r"(?:\bARN\b|ACKNOWLEDGE?MENT\s*(?:REFERENCE\s*)?(?:NUMBER|NO\b\.?)|\bACK\.?\s*NO\b\.?"
+    r"|TOKEN\s*(?:NUMBER|NO\b\.?)|(?:PROVISIONAL\s*)?RECEIPT\s*(?:NUMBER|NO\b\.?))"
+    r"\s*[:\-]?\s*([A-Z0-9]{10,20})\b"
+)
+
+BARE_ARN = re.compile(r"\b(A[A-Z][0-9]{2}[0-9A-Z]{11})\b")
+
+DAY_MONTH_YEAR = re.compile(r"\b([0-3]?[0-9])[/\-. ]([0-1]?[0-9]|[A-Z]{3,9})[/\-. ,]+(20[0-9]{2})\b")
+
+YEAR_MONTH_DAY = re.compile(r"\b(20[0-9]{2})-([0-1][0-9])-([0-3][0-9])\b")
+
+TYPE_KEYWORDS = {
+    "acknowledgement": ["ACKNOWLEDGEMENT", "ACKNOWLEDGMENT", "ARN", "ITR-V", "SUCCESSFULLY FILED"],
+    "gst_certificate": ["REG-06", "REGISTRATION CERTIFICATE", "CERTIFICATE OF REGISTRATION"],
+    "pan_card": ["PERMANENT ACCOUNT NUMBER", "INCOME TAX DEPARTMENT", "GOVT. OF INDIA"],
+    "bank_statement": ["STATEMENT OF ACCOUNT", "OPENING BALANCE", "CLOSING BALANCE", "IFSC"],
+    "invoice": ["TAX INVOICE", "INVOICE NO", "INVOICE NUMBER", "BILL TO", "HSN"],
+    "sales_register": ["SALES REGISTER", "SALES BOOK"],
+    "purchase_register": ["PURCHASE REGISTER", "PURCHASE BOOK"],
+    "salary_register": ["SALARY REGISTER", "NET PAY", "BASIC PAY", "PAYSLIP"],
+    "tds_challan": ["CHALLAN", "BSR CODE", "ITNS 281"],
+    "certificate_of_practice": ["CERTIFICATE OF PRACTICE", "CHARTERED ACCOUNTANTS OF INDIA"],
+}
+
+def _dates(clean, today):
+    found = []
+
+    for day, month, year in DAY_MONTH_YEAR.findall(clean):
+        month_number = int(month) if month.isdigit() else MONTHS.get(month)
+        
+        found.append((int(year), month_number, int(day)))
+    
+    for year, month, day in YEAR_MONTH_DAY.findall(clean):
+        found.append((int(year), int(month), int(day)))
+    
+    dates = []
+    
+    for year, month, day in found:
+        try:
+            value = date(year, month, day)
+        
+        except (TypeError, ValueError): 
+            continue
+        
+        if value <= today:
+            dates.append(value)
+    
+    return dates
+
+
+def guess_document_type(text):
+    clean = _clean(text)
+
+    best_type, best_hits = None, 0
+    
+    for doc_type, keywords in TYPE_KEYWORDS.items():
+        hits = sum(1 for keyword in keywords if re.search(rf"\b{re.escape(keyword)}\b", clean))
+    
+        if hits > best_hits:
+            best_type, best_hits = doc_type, hits
+    
+    return best_type
+
+
+def read_proof_fields(text, today):
+    clean = _clean(text)
+
+    ack_number = None
+
+    labelled = ACK_NUMBER.search(clean)
+
+    if labelled:
+        ack_number = labelled.group(1)
+
+    else:
+        bare = BARE_ARN.search(clean)
+
+        if bare:
+            ack_number = bare.group(1)
+
+    form_codes = []
+
+    for code, pattern in FORM_PATTERNS.items():
+        if pattern.search(clean):
+            form_codes.append(code)
+
+    dates = _dates(clean, today)
+
+    filing_date = None
+
+    if dates:
+        filing_date = max(dates).isoformat()
+
+    return {
+        "acknowledgement_no": ack_number,
+        "filing_date": filing_date,
+        "form_codes": form_codes,
+        "type_guess": guess_document_type(text),
+    }
