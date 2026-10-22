@@ -1,8 +1,8 @@
 from flask import jsonify, request
 from app import app
 from filings import DONE
-from helpers import current_user, error, date, iso, page_of, role_required, send_email, now
-from models import Business, CaProfile, ComplianceItem, Engagement, User, db, db_now
+from helpers import current_user, error, date, iso, page_of, role_required, send_email, now, send_document
+from models import Business, CaProfile, ComplianceItem, Engagement, User, Document,db, db_now
 from routes_marketplace import profile_to_dict
 
 
@@ -103,6 +103,20 @@ def admin_cas():
 
 
 
+@app.route("/api/v1/admin/cas/<uuid:ca_id>/certificate")
+@role_required("admin")
+def admin_ca_certificate(ca_id):
+
+    profile = db.session.get(CaProfile, ca_id)
+    if profile is None:
+        return error(404, "CA_NOT_FOUND", "This CA was not found.")
+    
+    if profile.cop_document_id is None:
+        return error(404, "CERTIFICATE_MISSING", "This CA has not uploaded a certificate.")
+    
+    return send_document(db.session.get(Document, profile.cop_document_id))
+
+
 
 @app.route("/api/v1/admin/cas/<uuid:ca_id>")
 @role_required("admin")
@@ -112,13 +126,6 @@ def admin_ca(ca_id):
         return error(404, "CA_NOT_FOUND", "This CA was not found.")
     
     return jsonify(ca_to_dict(profile))
-
-
-
-
-
-
-
 
 
 
