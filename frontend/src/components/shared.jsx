@@ -1,6 +1,6 @@
 import { errorMessage } from "@/api";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, linkClass} from "@/components/ui";
-import { cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
+import { CA_SPECIALIZATION_LABELS, cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -11,7 +11,6 @@ export function useAction() {
   async function run(action) {
     setError(null);
     setBusy(true);
-
 
     try {
       await action();
@@ -92,6 +91,25 @@ export function FormField({ id, label, error, hint, ...inputProps }) {
     </div>
   );
 }
+
+export function caFacts(ca) {
+  const years = ca.years_experience === 1 ? "year" : "years";
+  return `${ca.city} · ${ca.years_experience} ${years} of experience · ICAI no. ${ca.membership_no}`;
+}
+
+
+export function SpecializationBadges({ codes }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {codes.map((code) => (
+        <Badge key={code} variant="outline">
+          {label(CA_SPECIALIZATION_LABELS, code)}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
 
 export function field(form, name) {
   return { id: name, error: form.formState.errors[name], ...form.register(name) };

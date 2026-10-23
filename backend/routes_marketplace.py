@@ -3,13 +3,15 @@ import re
 from flask import jsonify, request
 
 from app import app
-from helpers import as_uuid, current_user, error, iso, money, read_amount, role_required
+from helpers import as_uuid, current_user, error, iso, money, read_amount, read_upload, remove_document, role_required, save_document
 from models import CaProfile, CaService, CatalogService, db
 
 
 
 
-LANGUAGES = ("English", "Hindi", "Bengali", "Gujarati", "Kannada", "Malayalam", "Marathi", "Odia", "Punjabi", "Tamil", "Telugu", "Urdu")
+LANGUAGES = ("english", "hindi", "bengali", "gujarati", "kannada", "malayalam", "marathi", "odia",
+             "punjabi", "tamil", "telugu", "urdu")
+
 SPECIALIZATIONS = ("itr", "gstr_1", "gstr_3b", "cmp_08", "gstr_4", "tds_24q", "tds_26q", "gst_registration",
                    "tax_audit", "accounting_bookkeeping", "income_tax_notices", "company_llp_compliance",
                    "startup_msme_advisory")
@@ -54,6 +56,26 @@ def get_ca_profile():
     
     if profile is None:
         return error(404, "CA_PROFILE_NOT_FOUND", "You have not completed your profile registrations yet.")
+    return jsonify(profile_to_dict(profile))
+
+
+@app.route("/api/v1/marketplace/ca-profile/certificate", methods=["POST"])
+@role_required("ca")
+def upload_certificate():
+    profile = my_profile()
+    if profile is None:
+        return error(404, "CA_PROFILE_NOT_FOUND", "You have not completed your profile yet.")
+    upload, data, problem = read_upload()
+    if problem:
+        return problem
+    old_file = profile.cop_document_id
+    certificate = save_document(profile.user_id, profile.user_id, "certificate_of_practice", upload, data)
+    profile.cop_document_id = certificate.id
+    if old_file:
+        db.session.flush()
+        remove_document(old_file)
+    profile.verification_status = "pending"
+    db.session.commit()
     return jsonify(profile_to_dict(profile))
 
 

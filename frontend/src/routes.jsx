@@ -10,6 +10,9 @@ import { CompliancePage } from "@/pages/business/CalenderPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
 import { FilingPage } from "@/pages/business/FilingPage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
+import { CaProfilePage } from "@/pages/ca/ProfilePage";
+
+
 
 export const NAV = {
   business: [
@@ -24,12 +27,12 @@ export const NAV = {
   ],
   ca: [
     { label: "Dashboard", path: "/ca" },
-    { label: "My profile", path: "/ca/profile" },
     { label: "Services & prices", path: "/ca/services" },
     { label: "My engagements", path: "/ca/engagements" },
     { label: "My clients", path: "/ca/clients" },
     { label: "Deadline batches", path: "/ca/batches" },
     { label: "Notification settings", path: "/ca/settings" },
+    { label: "My profile", path: "/ca/profile" },
   ],
   admin: [
     { label: "Dashboard", path: "/admin" },
@@ -78,8 +81,10 @@ export const appRoutes = [
   ]),
 
   roleArea("ca", [
-    { path: "settings", element: <SettingsPage /> },
+  { path: "settings", element: <SettingsPage /> },
+  { path: "profile", element: <CaProfilePage /> },
   ]),
+
 
   
   roleArea("admin", [
