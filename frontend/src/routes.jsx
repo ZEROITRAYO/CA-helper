@@ -9,8 +9,7 @@ import { BusinessDashboardPage } from "@/pages/business/DashboardPage";
 import { CompliancePage } from "@/pages/business/CalenderPage";
 import { OnboardingPage } from "@/pages/business/OnboardingPage";
 import { FilingPage } from "@/pages/business/FilingPage";
-
-
+import { DocumentsPage } from "@/pages/business/DocumentsPage";
 
 export const NAV = {
   business: [
@@ -21,6 +20,7 @@ export const NAV = {
     { label: "Find a CA", path: "/business/marketplace" },
     { label: "My engagements", path: "/business/engagements" },
     { label: "Notification settings", path: "/business/settings" },
+    
   ],
   ca: [
     { label: "Dashboard", path: "/ca" },
@@ -74,6 +74,7 @@ export const appRoutes = [
     { index: true, element: <BusinessDashboardPage /> },  
     { path: "compliance", element: <CompliancePage /> },
     { path: "compliance/:itemId", element: <FilingPage /> },
+    { path: "documents", element: <DocumentsPage /> },
   ]),
 
   roleArea("ca", [

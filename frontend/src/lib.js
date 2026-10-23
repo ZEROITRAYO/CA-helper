@@ -177,7 +177,7 @@ export const COMPLIANCE_STATUS_LABELS = {
   ready: "Ready",
   with_ca: "With CA",
   filed: "Filed",
-  filed_verified: "Filed–verified",
+  filed_verified: "Filed-verified",
   overdue: "Overdue",
 };
 
@@ -237,3 +237,17 @@ export function monthLabel(isoDate) {
   });
 
 }
+
+export const DOCUMENT_TYPE_LABELS = {
+  gst_certificate: "GST registration certificate",
+  pan_card: "PAN card",
+  sales_register: "Sales register",
+  purchase_register: "Purchase register",
+  bank_statement: "Bank statement",
+  invoice: "Invoice",
+  salary_register: "Salary register",
+  tds_challan: "TDS challan",
+  acknowledgement: "Filing acknowledgement",
+  certificate_of_practice: "Certificate of Practice(CA)",
+  other: "Other",
+};

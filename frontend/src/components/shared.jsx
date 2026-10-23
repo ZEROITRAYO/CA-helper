@@ -4,9 +4,6 @@ import { cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
 import { useState } from "react";
 import { Link } from "react-router";
 
-
-
-
 export function useAction() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -291,4 +288,14 @@ export function BackLink({ to, children })
   return ( <Link to={to} className={cn("text-sm", linkClass)}> {children} </Link> );
 }
 
-
+export function PageTitle({ title, children }) {
+  return (
+    <div className="space-y-1">
+  
+      <h1 className="text-2xl font-semibold">{title}</h1>    
+      
+      {children && <p className="text-sm text-hint">{children}</p>}
+    
+    </div>
+  );
+}
