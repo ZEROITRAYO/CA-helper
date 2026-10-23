@@ -98,6 +98,17 @@ export const ENTITY_TYPE_LABELS = {
 };
 
 
+
+
+export const SERVICE_UNIT_LABELS = {
+  per_return: "per return",
+  per_month: "per month",
+  per_year: "per year",
+  one_time: "one time",
+  per_notice: "per notice",
+};
+
+
 export const MSME_TIER_LABELS = {
   micro: "Micro",
   small: "Small",
@@ -251,3 +262,42 @@ export const DOCUMENT_TYPE_LABELS = {
   certificate_of_practice: "Certificate of Practice(CA)",
   other: "Other",
 };
+
+export const CA_VERIFICATION_STATUS_LABELS = {
+  pending: "Pending verification",
+  verified: "Verified",
+  rejected: "Rejected",
+};
+
+
+
+export const CA_SPECIALIZATION_LABELS = {
+  ...FORM_LABELS,
+  gst_registration: "GST registration",
+  tax_audit: "Tax audit",
+  accounting_bookkeeping: "Accounting & bookkeeping",
+  income_tax_notices: "Income-tax notices",
+  company_llp_compliance: "Company / LLP compliance",
+  startup_msme_advisory: "Startup & MSME advisory",
+};
+
+
+export const CA_LANGUAGE_LABELS = {
+  english: "English",
+  hindi: "Hindi",
+  bengali: "Bengali",
+  gujarati: "Gujarati",
+  kannada: "Kannada",
+  malayalam: "Malayalam",
+  marathi: "Marathi",
+  odia: "Odia",
+  punjabi: "Punjabi",
+  tamil: "Tamil",
+  telugu: "Telugu",
+  urdu: "Urdu",
+};
+
+
+export function labelList(labels, codes) {
+  return codes.map((code) => label(labels, code)).join(", ");
+}

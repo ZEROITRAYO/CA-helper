@@ -173,6 +173,24 @@ export function readRegistrationDocument(file) {
   return sendForm("/api/v1/onboarding/autofill", { file });
 }
 
+export const CA_PROFILE_KEY = ["marketplace", "ca-profile"];
+
+
+
+export function useCaProfile() {
+  const path = "/api/v1/marketplace/ca-profile";
+  return useGet(CA_PROFILE_KEY, path, { notFound: "CA_PROFILE_NOT_FOUND" });
+}
+
+
+export function saveCaProfile(profile) {
+  return apiFetch("/api/v1/marketplace/ca-profile", { method: "PUT", body: profile });
+}
+
+
+export function uploadCertificate(file) {
+  return sendForm("/api/v1/marketplace/ca-profile/certificate", { file });
+}
 
 
 export const NOTIFICATIONS_KEY = ["alerts", "notifications"];
