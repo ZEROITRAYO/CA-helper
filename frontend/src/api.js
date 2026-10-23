@@ -213,3 +213,72 @@ export function tickChecklist(itemId, key, ticked)
 {
   return apiFetch("/api/v1/compliance/items/" + itemId + "/checklist", { method: "POST", body: { key, ticked },});
 }
+
+export async function apiDownload(path) {
+  const hasToken = Boolean(accessToken);
+  
+  const response = await fetch(path, {
+    headers: hasToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  
+  if (response.ok) return response.blob();
+  
+  fail(response, await response.json().catch(() => null), hasToken);
+}
+
+
+
+export const UPLOAD_TYPES = [
+  "gst_certificate",
+  "pan_card",
+  "sales_register",
+  "purchase_register",
+  "bank_statement",
+  "invoice",
+  "salary_register",
+  "tds_challan",
+  "acknowledgement",
+  "other",
+];
+
+export const DOCUMENTS_KEY = ["documents"];
+
+export function useDocuments(params, enabled = true) {
+  return useGet([...DOCUMENTS_KEY, params], withQuery("/api/v1/documents", params), { enabled });
+}
+
+export function uploadDocument(file, fields) {
+  return sendForm("/api/v1/documents", { file, ...fields });
+}
+
+export function deleteDocument(documentId) {
+  return apiFetch("/api/v1/documents/" + documentId, { method: "DELETE" });
+}
+
+export function linkDocument(documentId, complianceItemId, checklistKey) {
+  
+  return apiFetch("/api/v1/documents/" + documentId + "/links", {
+    method: "POST", body: { compliance_item_id: complianceItemId, checklist_key: checklistKey },});
+}
+
+
+export function unlinkDocument(linkId) {
+  return apiFetch("/api/v1/documents/links/" + linkId, { method: "DELETE" });
+}
+
+
+export async function downloadDocument(document) {
+  const blob = await apiDownload("/api/v1/documents/" + document.id + "/file");
+  
+  const href = URL.createObjectURL(blob);
+  
+  const anchor = window.document.createElement("a");
+  
+  anchor.href = href;
+  
+  anchor.download = document.original_filename;
+  
+  anchor.click();
+  
+  setTimeout(() => URL.revokeObjectURL(href), 60_000); 
+}
