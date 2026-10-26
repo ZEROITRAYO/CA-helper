@@ -1,9 +1,10 @@
 import calendar
 from datetime import date
 
-from helpers import iso, REPO, now
-from models import (ChecklistTick, ComplianceItem, ComplianceItemDocument, DocumentRequest, Engagement, EngagementItem, ObligationTemplate, ReminderLog, db, Document,)
+from helpers import iso, REPO, now, read_upload, save_document, error
+from models import (ChecklistTick, ComplianceItem, ComplianceItemDocument, DocumentRequest, Engagement, EngagementItem, ObligationTemplate, ReminderLog, db, Document, db_now,)
 import json
+from flask import request
 
 DONE = ("filed", "filed_verified")
 NOT_STARTED = ("upcoming", "docs_pending", "ready", "overdue")
@@ -339,3 +340,35 @@ def verify_acknowledgement(document, filing):
 
     return result
 
+
+def record_filed(filing, owner_id, uploader, path):
+    
+    number = request.form.get("acknowledgement_no", "").strip().upper()
+    
+    if "file" in request.files:
+        upload, data, problem = read_upload()
+        
+        if problem:
+            return problem
+        
+        document = save_document(owner_id, uploader.id, "acknowledgement", upload, data)
+        
+        document.fy, document.period_label = filing.fy, filing.period_label
+        
+        filing.acknowledgement_document_id = document.id
+
+    filing.status= "filed"
+    filing.filing_path = path
+    filing.filed_at =  db_now()
+    filing.acknowledgement_no = number or None
+
+    if filing.acknowledgement_document_id:
+        result = verify_acknowledgement(db.session.get(Document, filing.acknowledgement_document_id), filing)
+
+        if result["verified"]:
+            filing.status = "filed_verified"
+            filing.verified_at =  db_now()
+
+            filing.acknowledgement_no = filing.acknowledgement_no or result["acknowledgement_no"]
+
+    return None

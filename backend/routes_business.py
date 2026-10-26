@@ -4,12 +4,12 @@ from flask import jsonify, request
 
 import ocr
 from app import app
-from filings import sync_filings, DONE, filing_to_dict, filing_page, checklist, set_tick
+from filings import sync_filings, DONE, filing_to_dict, filing_page, checklist, set_tick, NOT_STARTED, record_filed, refresh_status
 from helpers import (
     GST_STATES, current_user, error, format_inr, gstin_error, iso, money, my_business, read_amount,
-    read_upload, role_required, state_code, now,
+    read_upload, role_required, state_code, now, remove_document, send_document
 )
-from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now, ComplianceItem
+from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now, ComplianceItem, Document
 
 
 ENTITY_TYPES = ("individual", "proprietorship", "partnership", "llp", "private_limited")
@@ -397,3 +397,95 @@ def tick_checklist(item_id):
     result = filing_page(filing)
     return jsonify(result)
 
+
+
+@app.route("/api/v1/compliance/items/<uuid:item_id>/path", methods=["POST"])
+@role_required("business")
+def choose_path(item_id):
+    filing, problem = find_filing(item_id)
+    
+    if problem:
+        return problem
+    
+    path = (request.get_json(silent=True) or {}).get("path")
+    
+    if path not in ("self", "ca"):
+        return error(422, "VALIDATION_ERROR", "Choose self or ca")
+    
+    if filing.status not in NOT_STARTED:
+        return error(409, "FILING_LOCKED", "This filing is already with a CA or filed")
+    
+    filing.filing_path = path
+    
+    db.session.commit()
+    
+    return jsonify(filing_page(filing))
+
+
+
+@app.route("/api/v1/compliance/items/<uuid:item_id>/mark-filed", methods=["POST"])
+@role_required("business")
+def mark_filed(item_id):
+    filing, problem = find_filing(item_id)
+    
+    if problem:
+        return problem
+    
+    if filing.status == "with_ca":
+        return error(409, "FILING_WITH_CA", "Your CA is handling this filing")
+    
+    if filing.status not in NOT_STARTED:
+        return error(409, "ALREADY_FILED", "This filing is already marked as filed")
+    
+    user = current_user()
+    
+    problem = record_filed(filing, user.id, user, "self")
+    
+    if problem:
+        return problem
+    
+    db.session.commit()
+    
+    return jsonify(filing_page(filing))
+
+
+@app.route("/api/v1/compliance/items/<uuid:item_id>/unmark-filed", methods=["POST"])
+@role_required("business")
+def unmark_filed(item_id):
+    filing, problem = find_filing(item_id)
+    
+    if problem:
+        return problem
+    
+    if filing.status not in DONE or filing.filing_path != "self":
+        return error(409, "NOT_SELF_FILED", "Only a filing you marked as filed can be undone")
+    
+    old_file = filing.acknowledgement_document_id
+    
+    filing.acknowledgement_document_id = filing.acknowledgement_no = filing.filed_at = filing.verified_at = None
+    
+    filing.status = "upcoming"
+    
+    if old_file:
+        db.session.flush()
+        remove_document(old_file)
+    
+    refresh_status(filing)
+    
+    db.session.commit()
+    
+    return jsonify(filing_page(filing))
+
+
+@app.route("/api/v1/compliance/items/<uuid:item_id>/acknowledgement")
+@role_required("business")
+def download_acknowledgement(item_id):
+    filing, problem = find_filing(item_id)
+    
+    if problem:
+        return problem
+    
+    if filing.acknowledgement_document_id is None:
+        return error(404, "ACKNOWLEDGEMENT_MISSING", "No acknowledgement was uploaded")
+    
+    return send_document(db.session.get(Document, filing.acknowledgement_document_id))
