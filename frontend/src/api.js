@@ -17,6 +17,8 @@ export function setAuth(token, logoutFunction) {
   logout = logoutFunction;
 }
 
+
+
 export async function apiFetch(path, { method = "GET", body } = {}) {
   const headers = {};
   const isForm = body instanceof FormData; 
@@ -222,8 +224,7 @@ export function filingKey(itemId)
   return ["compliance", "item", itemId];
 }
 
-export function useFiling(itemId) 
-{
+export function useFiling(itemId){
   return useGet(filingKey(itemId), "/api/v1/compliance/items/" + itemId);
 }
 
@@ -231,6 +232,7 @@ export function tickChecklist(itemId, key, ticked)
 {
   return apiFetch("/api/v1/compliance/items/" + itemId + "/checklist", { method: "POST", body: { key, ticked },});
 }
+
 
 export async function apiDownload(path) {
   const hasToken = Boolean(accessToken);
@@ -301,6 +303,8 @@ export async function downloadDocument(document) {
   setTimeout(() => URL.revokeObjectURL(href), 60_000); 
 }
 
+
+
 export function chooseFilingPath(itemId, path) {
   
   return apiFetch("/api/v1/compliance/items/" + itemId + "/path", {
@@ -330,4 +334,57 @@ export function useAcknowledgementFile(itemId, enabled) {
     queryFn: () => apiDownload("/api/v1/compliance/items/" + itemId + "/acknowledgement"),
     enabled,
   });
+}
+
+export const ADMIN_CAS_KEY = ["admin", "cas"];
+export const ADMIN_STATS_KEY = ["admin", "stats"];
+
+export function useAdminDashboard() {
+  return useGet(["admin", "dashboard"], "/api/v1/admin/dashboard");
+}
+
+
+export function useAdminStats() {
+  return useGet(ADMIN_STATS_KEY, "/api/v1/admin/stats");
+}
+
+
+
+export function useAdminUsers({ role, search, page }) {
+  const url = withQuery("/api/v1/admin/users", { role, search, page: page > 1 ? page : "" });
+  return useGet(["admin", "users", url], url);
+}
+
+
+export function useAdminCas(status) {
+  return useGet([...ADMIN_CAS_KEY, status], "/api/v1/admin/cas?status=" + status);
+}
+
+export function adminCaKey(caId) {
+  return [...ADMIN_CAS_KEY, "one", caId];
+}
+
+
+
+export function useAdminCa(caId) {
+  return useGet(adminCaKey(caId), "/api/v1/admin/cas/" + caId);
+}
+
+
+export function useCertificateFile(caId, enabled) {
+  return useQuery({
+    queryKey: [...ADMIN_CAS_KEY, "certificate", caId],
+    queryFn: () => apiDownload("/api/v1/admin/cas/" + caId + "/certificate"),
+    enabled,
+  });
+}
+
+export function verifyCa(caId) {
+  return apiFetch("/api/v1/admin/cas/" + caId + "/verify", { method: "POST" });
+}
+
+
+
+export function rejectCa(caId, reason) {
+  return apiFetch("/api/v1/admin/cas/" + caId + "/reject", { method: "POST", body: { reason } });
 }
