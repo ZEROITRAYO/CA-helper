@@ -300,3 +300,34 @@ export async function downloadDocument(document) {
   
   setTimeout(() => URL.revokeObjectURL(href), 60_000); 
 }
+
+export function chooseFilingPath(itemId, path) {
+  
+  return apiFetch("/api/v1/compliance/items/" + itemId + "/path", {
+    method: "POST",
+    body: { path },
+  });
+}
+
+
+export function markFiled(itemId, acknowledgementNo, file) {
+  
+  const path = "/api/v1/compliance/items/" + itemId + "/mark-filed";
+  
+  return sendForm(path, { acknowledgement_no: acknowledgementNo, file });
+}
+
+
+export function unmarkFiled(itemId) {
+  return apiFetch("/api/v1/compliance/items/" + itemId + "/unmark-filed", { method: "POST" });
+}
+
+
+export function useAcknowledgementFile(itemId, enabled) {
+
+  return useQuery({
+    queryKey: [...filingKey(itemId), "acknowledgement"],
+    queryFn: () => apiDownload("/api/v1/compliance/items/" + itemId + "/acknowledgement"),
+    enabled,
+  });
+}
