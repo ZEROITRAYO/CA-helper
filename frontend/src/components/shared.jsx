@@ -1,8 +1,9 @@
+import { useEffect, useMemo, useState } from "react";
 import { errorMessage } from "@/api";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, linkClass} from "@/components/ui";
 import { CA_SPECIALIZATION_LABELS, cn, COMPLIANCE_STATUS_LABELS, label } from "@/lib";
-import { useState } from "react";
 import { Link } from "react-router";
+
 
 export function useAction() {
   const [busy, setBusy] = useState(false);
@@ -27,6 +28,12 @@ export function useAction() {
 }
 
 
+
+export function useObjectUrl(blob) {
+  const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
+  useEffect(() => () => url && URL.revokeObjectURL(url), [url]);
+  return url;
+}
 
 
 export function ErrorText({ children, className }) {

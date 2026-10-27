@@ -11,6 +11,7 @@ import { OnboardingPage } from "@/pages/business/OnboardingPage";
 import { FilingPage } from "@/pages/business/FilingPage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
 import { CaProfilePage } from "@/pages/ca/ProfilePage";
+import { AdminCaDetailPage, AdminDashboardPage, AdminUsersPage } from "@/pages/admin/AdminPages";
 
 
 
@@ -88,6 +89,9 @@ export const appRoutes = [
 
   
   roleArea("admin", [
+    { index: true, element: <AdminDashboardPage /> },
+    { path: "users", element: <AdminUsersPage /> },
+    { path: "cas/:caId", element: <AdminCaDetailPage /> },
   ]),
 
   
