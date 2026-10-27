@@ -336,6 +336,26 @@ export function useAcknowledgementFile(itemId, enabled) {
   });
 }
 
+
+export const CA_WORKSPACE_KEY = ["ca_workspace"];
+
+export function useMyDocumentRequests(itemId) {
+  
+  const query = itemId ? "?compliance_item_id=" + itemId : "";
+  
+  const path = "/api/v1/ca-workspace/document-requests" + query;
+  
+  return useGet([...CA_WORKSPACE_KEY, "my-requests", itemId ?? "all"], path);
+}
+
+
+export function fulfilDocumentRequest(requestId, documentId) {
+  
+  const path = "/api/v1/ca-workspace/document-requests/" + requestId + "/fulfil";
+
+  return apiFetch(path, { method: "POST", body: { document_id: documentId } });
+}
+
 export const ADMIN_CAS_KEY = ["admin", "cas"];
 export const ADMIN_STATS_KEY = ["admin", "stats"];
 
@@ -388,3 +408,4 @@ export function verifyCa(caId) {
 export function rejectCa(caId, reason) {
   return apiFetch("/api/v1/admin/cas/" + caId + "/reject", { method: "POST", body: { reason } });
 }
+

@@ -4,9 +4,9 @@ from app import app
 from filings import DONE, checklist, filing_name, set_tick
 from helpers import (
     as_uuid, current_user, error, iso, my_business, page_of, read_upload, remove_document, role_required,
-    save_document, send_document,
+    save_document, send_document, email_notice, notify
 )
-from models import CaProfile, ComplianceItem, ComplianceItemDocument, Document, Engagement, EngagementItem, db
+from models import CaProfile, ComplianceItem, ComplianceItemDocument, Document, Engagement, EngagementItem, db, DocumentRequest, User, db_now
 
 
 DOCUMENT_TYPES = ("gst_certificate", "pan_card", "sales_register", "purchase_register", "bank_statement",
@@ -266,3 +266,80 @@ def unlink_document(link_id):
     db.session.commit()
     
     return "", 204
+
+
+def request_to_dict(document_request):
+    filing = document_request.filing
+    
+    return {"id": str(document_request.id), "compliance_item_id": str(filing.id), "form_code": filing.form_code,
+            "period_label": filing.period_label, "checklist_key": document_request.checklist_key,
+            "message": document_request.message, "status": document_request.status,
+            "created_at": iso(document_request.created_at), "fulfilled_at": iso(document_request.fulfilled_at),
+            "document_id": str(document_request.document_id) if document_request.document_id else None}
+
+
+@app.route("/api/v1/ca-workspace/document-requests")
+@role_required("business")
+def list_document_requests():
+    business = my_business()
+
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first")
+    
+    requests = (DocumentRequest.query.join(Engagement, DocumentRequest.engagement_id == Engagement.id)
+                .filter(Engagement.business_id == business.id, Engagement.status == "active", DocumentRequest.status == "open")
+                .order_by(DocumentRequest.created_at))
+    
+    item_id = as_uuid(request.args.get("compliance_item_id"))
+    
+    rows = []
+    
+    for document_request in requests:
+        if item_id is None or document_request.compliance_item_id == item_id:
+            rows.append({**request_to_dict(document_request), "ca_name": document_request.engagement.ca.user.full_name})
+    
+    return jsonify(rows)
+
+
+@app.route("/api/v1/ca-workspace/document-requests/<uuid:request_id>/fulfil", methods=["POST"])
+@role_required("business")
+def fulfil_document_request(request_id):
+    document_request = db.session.get(DocumentRequest, request_id)
+    
+    business = my_business()
+    
+    engagement = document_request.engagement if document_request else None
+    
+    if engagement is None or business is None:
+        return error(404, "REQUEST_NOT_FOUND", "This document request was not found")
+    
+    business, document, problem = my_document(as_uuid((request.get_json(silent=True) or {}).get("document_id")))
+    
+    if problem:
+        return problem
+    
+    problem = link_to_filing(business, document, document_request.compliance_item_id, document_request.checklist_key)
+    
+    if problem:
+        return problem
+    
+    document_request.status = "fulfilled"
+    
+    document_request.fulfilled_at = db_now()
+    document_request.document_id =  document.id
+    
+    ca_user = db.session.get(User, engagement.ca.user_id)
+    
+    title = f"{business.legal_name} sent you the document you asked for"
+    
+    body = (f"From: {business.legal_name} (your client)\nTo: {ca_user.full_name}\n\n"
+            f"Filing: {filing_name(document_request.filing)}\nYour request: {document_request.message}\n"
+            f"Document sent: {document.original_filename}")
+    
+    notify(ca_user, "document_request", title, body, f"/ca/clients/{business.id}")
+    
+    db.session.commit()
+    
+    email_notice(ca_user, title, body)
+    
+    return jsonify(request_to_dict(document_request))

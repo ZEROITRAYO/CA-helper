@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useParams } from "react-router";
 
 import { DASHBOARD_KEY, filingKey, FILINGS_KEY, tickChecklist, useFiling, useRefresh, DOCUMENTS_KEY,
-        downloadDocument, linkDocument, unlinkDocument, useDocuments, UPLOAD_TYPES, uploadDocument, errorMessage,} from "@/api";
+        downloadDocument, linkDocument, unlinkDocument, useDocuments, UPLOAD_TYPES, uploadDocument, errorMessage,
+        useMyDocumentRequests,fulfilDocumentRequest, CA_WORKSPACE_KEY} from "@/api";
 
 import { BackLink, ErrorText, QueryStatus, Section, StatusBadge, useAction, Field, Options,} from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, Button, Input, Select,} from "@/components/ui";
@@ -431,6 +432,8 @@ export function FilingPage() {
         <>
           <Header page={filing.data} />
           
+          <CaRequests page={filing.data} />
+
           <Checklist page={filing.data} onUpdated={showUpdated} />
           
           <Guide page={filing.data} />
@@ -438,5 +441,89 @@ export function FilingPage() {
       )}
 
     </div>
+  );
+}
+
+
+function CaRequests({ page }) {
+  const item = page.filing;
+  const requests = useMyDocumentRequests(item.id);
+  const refresh = useRefresh();
+  
+  if (!requests.isSuccess || requests.data.length === 0) return null;
+
+  const labels = { general: "A document" };
+  
+  for (const entry of page.checklist) labels[entry.key] = entry.label;
+
+  return (
+    <Section
+      title="Your CA asked for documents"
+      description="Send each file here; your CA is told when it arrives"
+      className="ring-amber-300"
+      contentClassName="space-y-4 text-sm"
+    >
+
+      {requests.data.map((request) => (
+        <AnswerRequest
+          key={request.id}
+          request={request}
+          what={label(labels, request.checklist_key)}
+          onAnswered={() => refresh(CA_WORKSPACE_KEY, DOCUMENTS_KEY, filingKey(item.id), FILINGS_KEY)}
+        />
+      ))}
+
+    </Section>
+  );
+}
+
+
+
+function AnswerRequest({ request, what, onAnswered }) {
+  const { busy, error, setError, run } = useAction();
+
+  async function onSubmit(event) {
+    
+    event.preventDefault();
+    
+    const file = event.currentTarget.elements.file.files[0];
+    
+    const documentId = new FormData(event.currentTarget).get("document_id");
+    
+    if (!file && !documentId) return setError("Choose a file to upload, or one from your vault");
+    
+    const sent = await run(async () => {
+      const chosen = file ? (await uploadDocument(file, { doc_type: "other" })).id : documentId;
+      
+      await fulfilDocumentRequest(request.id, chosen);
+    });
+
+    if (sent) onAnswered();
+  }
+
+  return (
+    <form className="space-y-2 rounded-lg border p-3" onSubmit={onSubmit}>
+      
+      <p>
+        <span className="font-medium">{what}</span> . {request.ca_name}: "{request.message}"
+      </p>
+      
+      <div className="flex flex-wrap items-end gap-2">
+      
+        <Field id={"answer-file-" + request.id} label="Upload a file" className="space-y-1">
+          <Input id={"answer-file-" + request.id} name="file" type="file" accept={FILE_TYPES} />
+        </Field>
+      
+        <Field id={"answer-vault-" + request.id} label="or choose from your vault" className="space-y-1">
+          <VaultSelect id={"answer-vault-" + request.id} />
+        </Field>
+      
+        <Button type="submit" size="sm" disabled={busy}>
+          Send to my CA
+        </Button>
+      
+      </div>
+      <ErrorText>{error}</ErrorText>
+    </form>
   );
 }

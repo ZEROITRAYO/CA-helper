@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 
-import { useComplianceDashboard, useFilings } from "@/api";
+import { useComplianceDashboard, useFilings, useMyDocumentRequests } from "@/api";
 import { NumberCard, RegisterFirst, Welcome } from "@/components/shared";
 import { daysLeftText, daysUntil, filingFormLabel, formatDate } from "@/lib";
 
@@ -71,7 +71,18 @@ function Numbers({ numbers }) {
 
 function ToDo({ filings }) {
   const tasks = [];
+  const requests = useMyDocumentRequests();
 
+  for (const request of requests.data ?? []) {
+    tasks.push({
+      key: request.id,
+      
+      text: `${request.ca_name} asked for a document for ${filingFormLabel(request.form_code, request.period_label)} ${request.period_label}: ${request.message}`,
+      
+      to: `/business/compliance/${request.compliance_item_id}`,
+    });
+  }
+  
   const overdue = filings.filter((item) => {
     return !DONE.includes(item.status) &&
       daysUntil(item.due_date) < 0;
