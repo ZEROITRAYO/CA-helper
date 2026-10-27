@@ -331,3 +331,22 @@ export function useAcknowledgementFile(itemId, enabled) {
     enabled,
   });
 }
+
+export const CA_WORKSPACE_KEY = ["ca_workspace"];
+
+export function useMyDocumentRequests(itemId) {
+  
+  const query = itemId ? "?compliance_item_id=" + itemId : "";
+  
+  const path = "/api/v1/ca-workspace/document-requests" + query;
+  
+  return useGet([...CA_WORKSPACE_KEY, "my-requests", itemId ?? "all"], path);
+}
+
+
+export function fulfilDocumentRequest(requestId, documentId) {
+  
+  const path = "/api/v1/ca-workspace/document-requests/" + requestId + "/fulfil";
+
+  return apiFetch(path, { method: "POST", body: { document_id: documentId } });
+}
