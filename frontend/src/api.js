@@ -409,3 +409,21 @@ export function rejectCa(caId, reason) {
   return apiFetch("/api/v1/admin/cas/" + caId + "/reject", { method: "POST", body: { reason } });
 }
 
+
+
+
+export function useVerifiedCas({ specialization, language, city, service, page }) {
+  const url = withQuery("/api/v1/marketplace/cas", {
+    specialization,
+    language,
+    city,
+    service,
+    page: page > 1 ? page : "",
+  });
+  return useGet(["marketplace", "cas", url], url);
+}
+
+
+export function useVerifiedCa(caId) {
+  return useGet(["marketplace", "ca", caId], "/api/v1/marketplace/cas/" + caId);
+}

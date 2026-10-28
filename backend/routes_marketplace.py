@@ -4,7 +4,7 @@ from flask import jsonify, request
 
 from app import app
 from helpers import as_uuid, current_user, error, iso, money, read_amount, read_upload, remove_document, role_required, save_document
-from models import CaProfile, CaService, CatalogService, db
+from models import CaProfile, CaService, CatalogService, Engagement, Rating, db
 
 
 
@@ -39,6 +39,28 @@ def prices_of(profile):
     return {str(row.service_id): row.price for row in CaService.query.filter_by(ca_profile_id=profile.id)}
 
 
+def ratings_of(profile):
+    return (Rating.query.join(Engagement, Rating.engagement_id == Engagement.id).filter(Engagement.ca_profile_id == profile.id).order_by(Rating.created_at.desc()).all())
+
+
+
+def public_ca(profile):
+    stars = [rating.stars for rating in ratings_of(profile)]
+
+    return {"id": str(profile.id), 
+            "full_name": profile.user.full_name, 
+            "membership_no": profile.membership_no,
+            "city": profile.city, 
+            "languages": profile.languages, 
+            "specializations": profile.specializations,
+            "years_experience": profile.years_experience, 
+            "about": profile.about,
+            "rating_average": round(sum(stars) / len(stars), 1) 
+            
+            if stars else None, "rating_count": len(stars)}
+
+
+
 def catalog():
     services = []
     
@@ -47,6 +69,18 @@ def catalog():
                          "description": service.description, "unit": service.unit,
                          "specialization": SERVICE_SPECIALIZATIONS.get(service.code)})
     return services
+
+
+def is_full(profile, business_id=None):
+    clients = {e.business_id for e in Engagement.query.filter_by(ca_profile_id=profile.id, status="active")}
+    return business_id not in clients and len(clients) >= profile.capacity
+
+
+def listed_ca(ca_id):
+    profile = db.session.get(CaProfile, ca_id) if ca_id else None
+    return profile if profile and profile.verification_status == "verified" else None
+
+
 
 
 @app.route("/api/v1/marketplace/ca-profile", methods=["GET"])
@@ -99,15 +133,19 @@ def save_ca_profile():
 
     if not cop_number or len(cop_number) > 20 or not city or len(city) > 100 or len(about) > 500:
         return error(422, "VALIDATION_ERROR", "Fill in your CoP number, city and about (up to 500 characters).")
+    
     if not isinstance(languages, list) or not languages or any(x not in LANGUAGES for x in languages):
         return error(422, "VALIDATION_ERROR", "Choose at least one language.")
+    
     if not isinstance(specializations, list) or not specializations or \
             any(x not in SPECIALIZATIONS for x in specializations):
         return error(422, "VALIDATION_ERROR", "Choose at least one specialization.")
+    
     if type(capacity) is not int or not 1 <= capacity <= 1000 or type(years) is not int or not 0 <= years <= 70:
         return error(422, "VALIDATION_ERROR", "Enter your capacity (1 to 1000) and years of experience (0 to 70).")
     
     other = CaProfile.query.filter(CaProfile.membership_no == membership_no, CaProfile.user_id != current_user().id)
+
     
     if other.first():
         return error(409, "DUPLICATE_MEMBERSHIP_NO", "Another CA has already registered this membership number.")
@@ -146,8 +184,10 @@ def ca_services():
         for item in items:
             service_id = as_uuid(item.get("service_id")) if isinstance(item, dict) else None
             price = read_amount(item.get("price"), 1, 1000000) if isinstance(item, dict) else None
+
             if service_id is None or price is None:
                 return error(422, "VALIDATION_ERROR", "Choose a service and enter a price from 1 to 10,00,000.")
+            
             if db.session.get(CatalogService, service_id) is None:
                 return error(400, "UNKNOWN_SERVICE", "One of the services is not in the catalog.")
             new_prices[service_id] = price
@@ -161,3 +201,72 @@ def ca_services():
     prices = prices_of(profile) if profile else {}
     
     return jsonify({"items": [{"service_id": sid, "price": money(price)} for sid, price in prices.items()]})
+
+
+
+
+
+@app.route("/api/v1/marketplace/cas")
+@role_required("business")
+def list_cas():
+    args = request.args
+
+    if args.get("specialization") and args["specialization"] not in SPECIALIZATIONS:
+        return error(422, "VALIDATION_ERROR", "Unknown specialization.")
+    
+    if args.get("language") and args["language"] not in LANGUAGES:
+        return error(422, "VALIDATION_ERROR", "Unknown language.")
+
+    
+    service = CatalogService.query.filter_by(code=args.get("service")).first() if args.get("service") else None
+    rows = []
+
+    for profile in CaProfile.query.filter_by(verification_status="verified"):
+        if args.get("specialization") and args["specialization"] not in profile.specializations:
+            continue
+
+        if args.get("language") and args["language"] not in profile.languages:
+            continue
+
+        if args.get("city", "").strip().lower() not in profile.city.lower():
+            continue
+
+        prices = prices_of(profile)
+        if args.get("service") and (service is None or str(service.id) not in prices):
+            continue
+
+        if is_full(profile):  
+            continue
+
+
+        row = public_ca(profile)
+        row["price"] = money(prices[str(service.id)]) if service else None
+        rows.append(row)
+
+    rows.sort(key=lambda row: (-(row["rating_average"] or 0), -row["years_experience"], row["full_name"]))
+    page = max(args.get("page", 1, type=int), 1)
+    page_size = min(max(args.get("page_size", 20, type=int), 1), 100)
+    start = (page - 1) * page_size
+    return jsonify({"items": rows[start:start + page_size], 
+                    "page": page,
+                    "page_size": page_size,
+                    "total": len(rows)})
+
+
+@app.route("/api/v1/marketplace/cas/<uuid:ca_id>")
+@role_required("business")
+def get_ca(ca_id):
+    profile = listed_ca(ca_id)
+    if profile is None:
+        return error(404, "CA_NOT_FOUND", "This CA is not listed on the marketplace.")
+    
+    prices = prices_of(profile)
+    page = public_ca(profile)
+
+    page["services"] = [{**s, "price": money(prices[s["id"]])} for s in catalog() if s["id"] in prices]
+    page["reviews"] = [{"stars": r.stars, "review": r.review, "created_at": iso(r.created_at)}
+                       for r in ratings_of(profile)[:5]]
+
+    
+    return jsonify(page)
+
