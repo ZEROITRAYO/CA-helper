@@ -1,5 +1,4 @@
 import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
-
 import { useAuth } from "@/auth";
 import { Button } from "@/components/ui";
 import { cn, ROLE_HOME, USER_ROLE_LABELS } from "@/lib";
@@ -12,6 +11,8 @@ import { FilingPage } from "@/pages/business/FilingPage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
 import { CaProfilePage } from "@/pages/ca/ProfilePage";
 import { AdminCaDetailPage, AdminDashboardPage, AdminUsersPage } from "@/pages/admin/AdminPages";
+
+
 
 
 
@@ -62,9 +63,9 @@ export const appRoutes = [
     element: <PublicLayout />,
     
     children: [
+      { index: true, element: <HomePage /> },
       { path: "terms", element: <TermsPage /> },
       { path: "login", element: <LoginPage /> },
-      { index: true, element: <HomePage /> },
       { path: "signup", element: <SignupPage /> },
       { path: "verify-email", element: <VerifyEmailPage /> },
       { path: "forgot-password", element: <ForgotPasswordPage /> },
@@ -73,10 +74,9 @@ export const appRoutes = [
   },
   
   roleArea("business", [
+    { index: true, element: <BusinessDashboardPage /> },
     { path: "settings", element: <SettingsPage /> },
     { path: "onboarding", element: <OnboardingPage /> },
-    { index: true, element: <BusinessDashboardPage /> },  
-    { path: "compliance", element: <CompliancePage /> },
     { path: "compliance/:itemId", element: <FilingPage /> },
     { path: "documents", element: <DocumentsPage /> },
   ]),

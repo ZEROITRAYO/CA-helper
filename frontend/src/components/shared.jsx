@@ -324,3 +324,31 @@ export function PageTitle({ title, children }) {
     </div>
   );
 }
+
+
+
+export function VerifiedBadge() {
+  return <Badge className="bg-green-100 text-green-700">Verified</Badge>;
+}
+
+
+export function Stars({ stars }) {
+  return (
+    <span className="text-amber-500" role="img" aria-label={stars + " out of 5 stars"}>
+      {"*".repeat(stars)}
+    </span>
+  );
+}
+
+
+
+export function RatingSummary({ average, count }) {
+  if (!count) {
+    return <span className="text-hint">No ratings yet</span>;
+  }
+  return (
+    <span>
+      <span className="text-amber-500">★</span> {average} ({count} {count === 1 ? "rating" : "ratings"})
+    </span>
+  );
+}
