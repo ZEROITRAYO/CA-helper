@@ -79,6 +79,7 @@ export const appRoutes = [
     { path: "onboarding", element: <OnboardingPage /> },
     { path: "compliance/:itemId", element: <FilingPage /> },
     { path: "documents", element: <DocumentsPage /> },
+    { path: "compliance", element: <CompliancePage /> },
   ]),
 
   roleArea("ca", [

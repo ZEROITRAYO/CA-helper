@@ -336,6 +336,11 @@ export function useAcknowledgementFile(itemId, enabled) {
   });
 }
 
+export function usePeerInsights(itemId) {
+  const path = "/api/v1/compliance/items/" + itemId + "/peer-insights";
+ 
+  return useGet([...filingKey(itemId), "peers"], path);
+}
 
 export const CA_WORKSPACE_KEY = ["ca_workspace"];
 
