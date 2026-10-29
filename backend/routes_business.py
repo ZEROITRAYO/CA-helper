@@ -7,7 +7,7 @@ from app import app
 from filings import sync_filings, DONE, filing_to_dict, filing_page, checklist, set_tick, NOT_STARTED, record_filed, refresh_status
 from helpers import (
     GST_STATES, current_user, error, format_inr, gstin_error, iso, money, my_business, read_amount,
-    read_upload, role_required, state_code, now, remove_document, send_document
+    read_upload, role_required, state_code, now, remove_document, send_document, date
 )
 from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now, ComplianceItem, Document
 
@@ -489,3 +489,51 @@ def download_acknowledgement(item_id):
         return error(404, "ACKNOWLEDGEMENT_MISSING", "No acknowledgement was uploaded")
     
     return send_document(db.session.get(Document, filing.acknowledgement_document_id))
+
+
+@app.route("/api/v1/compliance/items/<uuid:item_id>/peer-insights")
+@role_required("business")
+def peer_insights(item_id):
+    
+    filing, problem = find_filing(item_id)
+    
+    if problem:
+        return problem
+    
+    business = db.session.get(Business, filing.business_id)
+    
+    profile = RegulatoryProfile.query.filter_by(business_id=business.id).first()
+    
+    tier = profile.msme_tier if profile else None
+    
+    result = {"form_code": filing.form_code, "scope": "none", "entity_type": business.entity_type,
+              "msme_tier": tier, "min_businesses": 10, "business_count": 0, "filing_count": 0,
+              "self": None, "ca": None}
+    
+    filed = ComplianceItem.query.filter(ComplianceItem.form_code == filing.form_code,
+                                        ComplianceItem.status.in_(DONE), ComplianceItem.filed_at.isnot(None)).all()
+    same_kind = set() 
+    
+    for other in RegulatoryProfile.query.filter_by(msme_tier=tier):
+        if db.session.get(Business, other.business_id).entity_type == business.entity_type:
+            same_kind.add(other.business_id)
+    
+    for scope, group in (("segment", [f for f in filed if f.business_id in same_kind]), ("overall", filed)):
+        businesses = {f.business_id for f in group}
+    
+        if len(businesses) < 10:
+            continue
+    
+        result.update(scope=scope, business_count=len(businesses), filing_count=len(group))
+    
+        for path in ("self", "ca"):
+            items = [f for f in group if f.filing_path == path]
+            
+            on_time = [f for f in items if date(f.filed_at) <= f.due_date]
+            
+            result[path] = {"count": len(items), "share_pct": round(len(items) * 100 / len(group)),
+                            "on_time_pct": round(len(on_time) * 100 / len(items)) if items else None}
+        break
+    
+    return jsonify(result)
+

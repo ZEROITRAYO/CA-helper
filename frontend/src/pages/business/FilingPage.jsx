@@ -4,11 +4,11 @@ import { useParams } from "react-router";
 
 import { DASHBOARD_KEY, filingKey, FILINGS_KEY, tickChecklist, useFiling, useRefresh, DOCUMENTS_KEY,
         downloadDocument, linkDocument, unlinkDocument, useDocuments, UPLOAD_TYPES, uploadDocument, errorMessage,
-        useMyDocumentRequests,fulfilDocumentRequest, CA_WORKSPACE_KEY} from "@/api";
+        useMyDocumentRequests,fulfilDocumentRequest, CA_WORKSPACE_KEY, usePeerInsights} from "@/api";
 
 import { BackLink, ErrorText, QueryStatus, Section, StatusBadge, useAction, Field, Options,} from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, Button, Input, Select,} from "@/components/ui";
-import { daysLeftText, filingFormLabel, formatDate, DOCUMENT_TYPE_LABELS, label, } from "@/lib";
+import { daysLeftText, filingFormLabel, formatDate, DOCUMENT_TYPE_LABELS, label, ENTITY_TYPE_LABELS, MSME_TIER_LABELS } from "@/lib";
 
 
 const FILED = ["filed", "filed_verified"];
@@ -432,6 +432,8 @@ export function FilingPage() {
         <>
           <Header page={filing.data} />
           
+          <PeerInsights item={filing.data.filing} />
+          
           <CaRequests page={filing.data} />
 
           <Checklist page={filing.data} onUpdated={showUpdated} />
@@ -525,5 +527,61 @@ function AnswerRequest({ request, what, onAnswered }) {
       </div>
       <ErrorText>{error}</ErrorText>
     </form>
+  );
+}
+
+
+function PeerInsights({ item }) {
+  
+  const peers = usePeerInsights(item.id);
+
+  if (!peers.isSuccess) return null;
+
+  const data = peers.data;
+
+  const form = filingFormLabel(item.form_code, item.period_label);
+
+  let who = `all ${data.business_count} businesses on CA Helper that filed ${form}`;
+
+  if (data.scope === "segment") {
+    const tier = label(MSME_TIER_LABELS, data.msme_tier).toLowerCase();
+
+    const type = label(ENTITY_TYPE_LABELS, data.entity_type).toLowerCase();
+
+    who = `${data.business_count} ${tier} businesses like yours (${type}) that filed ${form}`;
+  }
+
+  if (data.scope === "none") {
+    return (
+      <Section
+        title="How similar businesses file it"
+        description={`Not enough businesses have filed ${form} here yet to compare (at least ${data.min_businesses} are needed)`}
+      />
+    );
+  }
+  return (
+    <Section
+      title="How similar businesses file it"
+      description={`Among ${who}:`}
+      contentClassName="grid gap-3 text-sm sm:grid-cols-2"
+    >
+      <PeerPath title="Filed it themselves" figures={data.self} />
+      
+      <PeerPath title="Filed it through a CA" figures={data.ca} />
+
+    </Section>
+  );
+}
+
+function PeerPath({ title, figures }) {
+  return (
+    <div className="rounded-lg border p-3">
+    
+      <p className="text-hint">{title}</p>
+    
+      <p className="text-2xl font-semibold tabular-nums">{figures.share_pct ?? 0}%</p>
+    
+      <p>{figures.on_time_pct === null ? "No filings yet" : `${figures.on_time_pct}% of them on time`}</p>
+    </div>
   );
 }
