@@ -5,16 +5,18 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import {
-  ApiRequestError, CA_PROFILE_KEY, errorMessage, saveCaProfile, uploadCertificate, useCaProfile,} from "@/api";
+  ApiRequestError, CA_PROFILE_KEY, CA_SERVICES_KEY, errorMessage, saveCaProfile, saveCaServices, uploadCertificate, useCaProfile, useCaServices, useServices} from "@/api";
 import { useAuth } from "@/auth";
 import {
-  caFacts, ErrorText, Field, field, FormField, Notice, QueryStatus, Section, SpecializationBadges, useAction,
+  caFacts, ErrorText, Field, field, PageTitle, FormField, Notice, QueryStatus, Section, SpecializationBadges, useAction,
 } from "@/components/shared";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea,
+import { Badge, Button, Card, buttonClass, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea,
 } from "@/components/ui";
 import {
-  CA_LANGUAGE_LABELS, CA_SPECIALIZATION_LABELS, CA_VERIFICATION_STATUS_LABELS, label, labelList,
+  CA_LANGUAGE_LABELS, CA_SPECIALIZATION_LABELS, CA_VERIFICATION_STATUS_LABELS, label, labelList, SERVICE_UNIT_LABELS,
 } from "@/lib";
+import { Link } from "react-router";
+
 
 
 const profileSchema = z.object({
@@ -304,5 +306,230 @@ function CheckboxGroup({ legend, labels, error, ...inputProps }) {
       </div>
       {error && <p className="text-sm text-danger">{error.message}</p>}
     </fieldset>
+  );
+}
+
+const EMPTY_ROW = { offered: false, price: "" };
+const MIN_PRICE = 1;
+const MAX_PRICE = 1000000;
+const PRICE_ERROR = "Enter a price from 1 to 10,00,000.";
+
+
+export function CaServicesPage() {
+  const profile = useCaProfile();
+  const services = useServices();
+  const menu = useCaServices();
+
+  let content = <QueryStatus query={[profile, services, menu]} />;
+  if (profile.isSuccess && services.isSuccess && menu.isSuccess) {
+    content = profile.data ? (
+      <PriceMenu services={services.data} menu={menu.data} profile={profile.data} />
+    ) : (
+      <Card>
+        <CardHeader>
+          <CardTitle>Complete your profile first</CardTitle>
+          <CardDescription>You can set your prices once your profile is saved.</CardDescription>
+          <div>
+            <Link to="/ca/profile" className={buttonClass()}>Complete profile</Link>
+          </div>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <PageTitle title="Services & prices">
+        Tick the services you offer and enter your fee. Businesses pay exactly this fee.
+      </PageTitle>
+      {content}
+    </div>
+  );
+}
+
+
+
+function startingRows(services, menu) {
+  const rows = {};
+  for (const service of services) {
+    rows[service.id] = { offered: false, price: "" };
+  }
+  for (const item of menu.items) {
+    rows[item.service_id] = { offered: true, price: String(Number(item.price)) };
+  }
+  return rows;
+}
+
+
+
+function PriceMenu({ services, menu, profile }) {
+  const queryClient = useQueryClient();
+  const [rows, setRows] = useState(startingRows(services, menu));
+  const [errors, setErrors] = useState({});
+  const [errorSummary, setErrorSummary] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const { busy, error, setError, run } = useAction();
+
+  function updateRow(serviceId, changes) {
+    setRows({ ...rows, [serviceId]: { ...(rows[serviceId] ?? EMPTY_ROW), ...changes } });
+    if (changes.offered === false && errors[serviceId]) {
+      const remaining = { ...errors };
+      delete remaining[serviceId];
+      setErrors(remaining);
+      setErrorSummary(null);
+    }
+    setSaved(false);
+  }
+
+  async function onSave(event) {
+    event.preventDefault();
+    setError(null);
+    setErrorSummary(null);
+    setSaved(false);
+
+
+    const items = [];
+    const newErrors = {};
+    const wrongNames = [];
+    for (const service of services) {
+
+      const row = rows[service.id] ?? EMPTY_ROW;
+      if (!row.offered) continue;
+      const price = Number(row.price);
+
+      if (row.price === "" || isNaN(price) || price < MIN_PRICE || price > MAX_PRICE) {
+        newErrors[service.id] = PRICE_ERROR;
+        wrongNames.push(service.name);
+      } else {
+        items.push({ service_id: service.id, price: row.price });
+      }
+    }
+
+    setErrors(newErrors);
+    if (wrongNames.length > 0) {
+      const count = wrongNames.length === 1 ? "1 price" : wrongNames.length + " prices";
+      setErrorSummary("Fix " + count + ": " + wrongNames.join(", ") + ".");
+      document.getElementById(priceId(Object.keys(newErrors)[0]))?.focus();
+      return;
+    }
+
+    await run(async () => {
+      queryClient.setQueryData(CA_SERVICES_KEY, await saveCaServices(items));
+      setSaved(true);
+    });
+  }
+
+
+  return (
+    <form className="space-y-4" onSubmit={onSave} noValidate>
+      {profile.verification_status !== "verified" && (
+        <p className="text-sm text-hint">
+          Businesses see your prices once an admin has verified your profile.
+        </p>
+      )}
+      <SpecializationWarning services={services} rows={rows} profile={profile} />
+      <ul className="space-y-3">
+        {services.map((service) => (
+          <ServiceRow
+            key={service.id}
+            service={service}
+            row={rows[service.id] ?? EMPTY_ROW}
+            error={errors[service.id]}
+            onChange={(changes) => updateRow(service.id, changes)}
+          />
+        ))}
+      </ul>
+      <ErrorText>{errorSummary}</ErrorText>
+      <ErrorText>{error}</ErrorText>
+      <Notice>{saved && "Prices saved."}</Notice>
+      <Button type="submit" disabled={busy}>
+        {busy ? "Saving..." : "Save prices"}
+      </Button>
+    </form>
+  );
+}
+
+
+
+function SpecializationWarning({ services, rows, profile }) {
+  const queryClient = useQueryClient();
+  const { busy, error, run } = useAction();
+
+  const missing = [];
+
+  for (const service of services) {
+    const code = service.specialization;
+    if (rows[service.id]?.offered && code && !profile.specializations.includes(code)) {
+      if (!missing.includes(code)) missing.push(code);
+    }
+  }
+
+  if (missing.length === 0) return null;
+
+
+  function onAdd() {
+    run(async () => {
+      const specializations = profile.specializations.concat(missing);
+      const updated = await saveCaProfile({ ...formValues(profile), specializations });
+      queryClient.setQueryData(CA_PROFILE_KEY, updated);
+    });
+  }
+
+  return (
+    <div role="note" className="space-y-2 rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+      <p>
+        You price services that are not among your specializations:{" "}
+        {labelList(CA_SPECIALIZATION_LABELS, missing)}. Businesses filtering by specialization will
+        not find you for them.
+      </p>
+      <Button type="button" size="sm" variant="outline" onClick={onAdd} disabled={busy}>
+        {busy ? "Adding..." : "Add to specializations"}
+      </Button>
+      {error && <p className="text-danger">{error}</p>}
+    </div>
+  );
+}
+
+
+function priceId(serviceId) {
+  return "price-" + serviceId;
+}
+
+
+function ServiceRow({ service, row, error, onChange }) {
+  const id = priceId(service.id);
+  return (
+    <li className="space-y-2 rounded-lg border p-3">
+      <label htmlFor={"offer-" + service.id} className="flex items-center gap-2 font-medium">
+        <input
+          id={"offer-" + service.id}
+          type="checkbox"
+          checked={row.offered}
+          onChange={(event) => onChange({ offered: event.target.checked })}
+        />
+        {service.name}
+      </label>
+      <p className="text-xs text-hint">{service.description}</p>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span>₹</span>
+        <Input
+          id={id}
+          aria-label={"Price for " + service.name}
+          aria-describedby={error ? id + "-error" : undefined}
+          inputMode="decimal"
+          className="w-32"
+          value={row.price}
+          disabled={!row.offered}
+          aria-invalid={!!error}
+          onChange={(event) => onChange({ price: event.target.value })}
+        />
+        <span>{label(SERVICE_UNIT_LABELS, service.unit)}</span>
+      </div>
+      {error && (
+        <p id={id + "-error"} className="text-sm text-danger">
+          {error}
+        </p>
+      )}
+    </li>
   );
 }

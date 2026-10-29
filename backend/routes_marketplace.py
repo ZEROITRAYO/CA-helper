@@ -166,7 +166,10 @@ def save_ca_profile():
     db.session.commit()
     return jsonify(profile_to_dict(profile))
 
-
+@app.route("/api/v1/marketplace/services")
+@role_required("ca", "business")
+def services():
+    return jsonify(catalog())
 
 @app.route("/api/v1/marketplace/ca-services", methods=["GET", "PUT"])
 @role_required("ca")

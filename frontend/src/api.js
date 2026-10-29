@@ -427,3 +427,18 @@ export function useVerifiedCas({ specialization, language, city, service, page }
 export function useVerifiedCa(caId) {
   return useGet(["marketplace", "ca", caId], "/api/v1/marketplace/cas/" + caId);
 }
+
+export function useServices() {
+  return useGet(["marketplace", "services"], "/api/v1/marketplace/services");
+}
+
+export const CA_SERVICES_KEY = ["marketplace", "ca-services"];
+
+
+export function useCaServices() {
+  return useGet(CA_SERVICES_KEY, "/api/v1/marketplace/ca-services");
+}
+
+export function saveCaServices(items) {
+  return apiFetch("/api/v1/marketplace/ca-services", { method: "PUT", body: { items } });
+}
