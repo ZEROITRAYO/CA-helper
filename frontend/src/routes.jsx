@@ -11,6 +11,7 @@ import { FilingPage } from "@/pages/business/FilingPage";
 import { DocumentsPage } from "@/pages/business/DocumentsPage";
 import { CaProfilePage, CaServicesPage } from "@/pages/ca/ProfilePage";
 import { AdminCaDetailPage, AdminDashboardPage, AdminUsersPage } from "@/pages/admin/AdminPages";
+import { CaDetailPage, MarketplacePage } from "@/pages/business/FindCaPage";
 
 
 
@@ -80,6 +81,8 @@ export const appRoutes = [
     { path: "compliance/:itemId", element: <FilingPage /> },
     { path: "documents", element: <DocumentsPage /> },
     { path: "compliance", element: <CompliancePage /> },
+    { path: "marketplace", element: <MarketplacePage /> },
+    { path: "marketplace/:caId", element: <CaDetailPage /> },
   ]),
 
   roleArea("ca", [
