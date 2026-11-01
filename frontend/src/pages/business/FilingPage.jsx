@@ -1,14 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useParams } from "react-router";
+import { useParams, Link } from "react-router";
 
 import { DASHBOARD_KEY, filingKey, FILINGS_KEY, tickChecklist, useFiling, useRefresh, DOCUMENTS_KEY,
         downloadDocument, linkDocument, unlinkDocument, useDocuments, UPLOAD_TYPES, uploadDocument, errorMessage,
-        useMyDocumentRequests,fulfilDocumentRequest, CA_WORKSPACE_KEY, usePeerInsights} from "@/api";
+        useMyDocumentRequests,fulfilDocumentRequest, CA_WORKSPACE_KEY, usePeerInsights, chooseFilingPath, markFiled, 
+        unmarkFiled, useAcknowledgementFile} from "@/api";
 
-import { BackLink, ErrorText, QueryStatus, Section, StatusBadge, useAction, Field, Options,} from "@/components/shared";
-import { Card, CardContent, CardDescription, CardHeader, Button, Input, Select,} from "@/components/ui";
-import { daysLeftText, filingFormLabel, formatDate, DOCUMENT_TYPE_LABELS, label, ENTITY_TYPE_LABELS, MSME_TIER_LABELS } from "@/lib";
+import { BackLink, ErrorText, QueryStatus, Section, StatusBadge, useAction, Field, Options, FormField, useObjectUrl} from "@/components/shared";
+import { Card, CardContent, CardDescription, CardHeader, Button, Input, Select, } from "@/components/ui";
+import { daysLeftText, filingFormLabel, formatDate, DOCUMENT_TYPE_LABELS, label, ENTITY_TYPE_LABELS, MSME_TIER_LABELS, formatDateTime} from "@/lib";
 
 
 const FILED = ["filed", "filed_verified"];
@@ -432,6 +433,8 @@ export function FilingPage() {
         <>
           <Header page={filing.data} />
           
+          <HowToFile page={filing.data} onUpdated={showUpdated} />
+          
           <PeerInsights item={filing.data.filing} />
           
           <CaRequests page={filing.data} />
@@ -583,5 +586,200 @@ function PeerPath({ title, figures }) {
     
       <p>{figures.on_time_pct === null ? "No filings yet" : `${figures.on_time_pct}% of them on time`}</p>
     </div>
+  );
+}
+
+const OPEN_FOR_BUSINESS = ["upcoming", "docs_pending", "ready", "overdue"];
+
+
+function HowToFile({ page, onUpdated }) {
+  
+  if (FILED.includes(page.filing.status)) 
+  {
+    return <Filed page={page} onUpdated={onUpdated} />;
+  }
+
+  return <ChoosePath page={page} onUpdated={onUpdated} />;
+}
+
+
+function ChoosePath({ page, onUpdated }) {
+  const item = page.filing;
+  const { busy, error, run } = useAction();
+  
+  const findCaLink =
+    item.form_code === "itr" ? "/business/marketplace" : `/business/marketplace?service=${item.form_code}`;
+
+  function pathButton(path, text) {
+    const chosen = item.filing_path === path;
+    
+    return (
+      <Button
+        variant={chosen ? "default" : "outline"}
+        aria-pressed={chosen}
+        disabled={busy}
+        onClick={() => run(async () => onUpdated(await chooseFilingPath(item.id, path)))}
+      >
+        {text}
+      </Button>
+    );
+  }
+
+  return (
+    <Section
+      title="How will you file it?"
+      description="File it yourself on the government portal, or let a CA do it for you"
+      contentClassName="space-y-4"
+    >
+      {OPEN_FOR_BUSINESS.includes(item.status) && (
+        
+        <div className="flex flex-wrap gap-2">
+        
+          {pathButton("self", "I will file it myself")}
+        
+          {pathButton("ca", "Get a CA")}
+        </div>
+      )}
+      
+      <ErrorText>{error}</ErrorText>
+      
+      {item.filing_path === "ca" && (
+        <p className="text-sm">
+      
+          <Link to={findCaLink} className="text-primary hover:underline">
+            Find a CA for this filing 
+          </Link>
+
+        </p>
+      )}
+      {item.filing_path === "self" && <MarkFiledForm page={page} onUpdated={onUpdated} />}
+    </Section>
+  );
+}
+
+
+function MarkFiledForm({ page, onUpdated }) {
+  const [arn, setArn] = useState("");
+  const [file, setFile] = useState(null);
+  
+  const { busy, error, run } = useAction();
+
+  function onSubmit(event) {
+    event.preventDefault();
+    
+    run(async () => onUpdated(await markFiled(page.filing.id, arn.trim(), file)));
+  }
+
+  return (
+    <form className="space-y-3 border-t pt-4" onSubmit={onSubmit}>
+      
+      <p className="text-sm font-medium">Filed it on the portal? Mark it as filed</p>
+     
+     <FormField
+        id="acknowledgement_no"
+        label="Acknowledgement number (optional)"
+        value={arn}
+        onChange={(event) => setArn(event.target.value)}
+      />
+
+      <Field id="acknowledgement_file" label="Acknowledgement file (optional: PDF, JPG or PNG)">
+        <input
+          id="acknowledgement_file"
+          type="file"
+          accept="application/pdf,image/jpeg,image/png"
+          className="block text-sm"
+          onChange={(event) => setFile(event.target.files[0] || null)}
+        />
+      </Field>
+
+      <ErrorText>{error}</ErrorText>
+      
+      <Button type="submit" disabled={busy}>
+        {busy ? "Saving..." : "Mark as filed"}
+      </Button>
+
+    </form>
+  );
+}
+
+function Verification({ verification }) {
+ 
+  if (verification.verified) {
+    return (
+      <p className="rounded-lg bg-green-50 p-3 text-green-900">
+        Verified from the acknowledgement: number {verification.acknowledgement_no}, filed on{" "} {formatDate(verification.filing_date)}.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg bg-amber-50 p-3 text-amber-900">
+      
+      <p className="font-medium">We could not verify it from the acknowledgement:</p>
+      
+      <ul className="list-disc pl-5">
+        {verification.problems.map((problem) => (
+          <li key={problem}>{problem}</li>
+        ))}
+      
+      </ul>
+      
+      <p className="mt-1 text-xs">
+        Check that you uploaded the acknowledgement of this filing, It stays marked as filed
+      </p>
+
+    </div>
+  );
+}
+
+
+function Filed({ page, onUpdated }) {
+  const item = page.filing;
+  const acknowledgement = page.acknowledgement;
+  
+  const { error, run } = useAction();
+  
+  const file = useAcknowledgementFile(item.id, acknowledgement !== null);
+  
+  const url = useObjectUrl(file.data);
+
+  return (
+    <Section
+      title={item.status === "filed_verified" ? "Filed and verified" : "Filed"}
+      description={
+        <>
+          {item.filed_at ? `Marked as filed on ${formatDateTime(item.filed_at)}` : "Filed."}
+          {item.acknowledgement_no && ` Acknowledgement number: ${item.acknowledgement_no}`}
+        </>
+      }
+      contentClassName="space-y-3 text-sm"
+    >
+      {acknowledgement === null ? (<p className="text-hint">No acknowledgement file was uploaded</p>) : url ? (
+        
+        <a href={url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+          Open the acknowledgement ({acknowledgement.filename})
+        </a>
+
+      ) : (
+        <p className="text-hint">Loading the acknowledgement...</p>
+      )}
+
+      {acknowledgement !== null && <Verification verification={acknowledgement.verification} />}
+
+      {item.filing_path === "self" && (
+        <div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => run(async () => onUpdated(await unmarkFiled(item.id)))}
+          >
+            Undo: not filed yet
+          </Button>
+        </div>
+      )}
+
+      <ErrorText>{error}</ErrorText>
+
+    </Section>
   );
 }
