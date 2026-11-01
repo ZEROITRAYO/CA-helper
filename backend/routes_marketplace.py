@@ -1,11 +1,9 @@
 import re
-
 from flask import jsonify, request
-
 from app import app
-from helpers import as_uuid, current_user, error, iso, money, read_amount, read_upload, remove_document, role_required, save_document
-from models import CaProfile, CaService, CatalogService, Engagement, Rating, db
-
+from helpers import as_uuid, current_user, error, iso, my_business,money, read_amount, read_upload, remove_document, role_required, save_document, send_email, notify
+from models import CaProfile, CaService, CatalogService, ComplianceItem, Engagement, EngagementItem, RegulatoryProfile ,Rating, db, db_now
+from filings import open_filing_ids
 
 
 
@@ -15,12 +13,18 @@ LANGUAGES = ("english", "hindi", "bengali", "gujarati", "kannada", "malayalam", 
 SPECIALIZATIONS = ("itr", "gstr_1", "gstr_3b", "cmp_08", "gstr_4", "tds_24q", "tds_26q", "gst_registration",
                    "tax_audit", "accounting_bookkeeping", "income_tax_notices", "company_llp_compliance",
                    "startup_msme_advisory")
+
 SERVICE_SPECIALIZATIONS = {
     "itr_presumptive": "itr", "itr_business": "itr", "itr_firm_company": "itr", "gstr_1": "gstr_1",
     "gstr_3b": "gstr_3b", "cmp_08": "cmp_08", "gstr_4": "gstr_4", "tds_24q": "tds_24q", "tds_26q": "tds_26q",
     "gst_registration": "gst_registration", "tax_audit": "tax_audit", "bookkeeping": "accounting_bookkeeping",
     "income_tax_notice": "income_tax_notices",
 }
+
+
+FULL_MESSAGE = "This CA is not taking new clients right now: all their client slots are full."
+ITR_SERVICES = {"itr_3": "itr_business", "itr_4": "itr_presumptive", "itr_5": "itr_firm_company", "itr_6": "itr_firm_company"}
+
 
 
 def profile_to_dict(profile):
@@ -80,6 +84,44 @@ def listed_ca(ca_id):
     profile = db.session.get(CaProfile, ca_id) if ca_id else None
     return profile if profile and profile.verification_status == "verified" else None
 
+
+
+def engagement_to_dict(engagement):
+    items = [{
+            "id": str(item.id),
+            "compliance_item_id": str(item.compliance_item_id),
+            "form_code": item.filing.form_code,
+            "period_label": item.filing.period_label,
+            "due_date": iso(item.filing.due_date),
+            "service_name": item.service.name,
+            "listed_price": money(item.listed_price),
+            "agreed_price": money(item.agreed_price)
+        }
+
+        for item in EngagementItem.query.filter_by(
+            engagement_id=engagement.id
+        ).order_by(EngagementItem.created_at)
+    ]
+
+    rating = Rating.query.filter_by(engagement_id=engagement.id).first()
+
+    return {
+        "id": str(engagement.id),
+        "status": engagement.status,
+        "ca_profile_id": str(engagement.ca_profile_id),
+        "ca_name": engagement.ca.user.full_name,
+        "business_name": engagement.business.legal_name,
+        "requested_at": iso(engagement.requested_at),
+        "responded_at": iso(engagement.responded_at),
+        "activated_at": iso(engagement.activated_at),
+        "completed_at": iso(engagement.completed_at),
+        "items": items,
+        "rating": {
+            "stars": rating.stars,
+            "review": rating.review,
+            "created_at": iso(rating.created_at)
+        } if rating else None
+    }
 
 
 
@@ -273,3 +315,181 @@ def get_ca(ca_id):
     
     return jsonify(page)
 
+
+
+def services_for(profile, business, filing):
+    regulatory = RegulatoryProfile.query.filter_by(business_id=business.id).first()
+    itr_service = ITR_SERVICES.get(regulatory.itr_form if regulatory else None)
+    prices = prices_of(profile)
+
+    return [
+        {
+            "service_id": str(service.id),
+            "name": service.name,
+            "price": money(prices[str(service.id)])
+        }
+
+        for service in CatalogService.query.filter_by(
+            form_code=filing.form_code
+        ).order_by(CatalogService.sort_order)
+
+        if str(service.id) in prices and (filing.form_code != "itr" or service.code == itr_service)
+    ]
+
+
+
+@app.route("/api/v1/marketplace/cas/<uuid:ca_id>/requestable-filings")
+@role_required("business")
+def requestable_filings(ca_id):
+    business, profile = my_business(), listed_ca(ca_id)
+
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first.")
+    
+    if profile is None:
+        return error(404, "CA_NOT_FOUND", "This CA is not listed on the marketplace.")
+
+    
+    filings = ComplianceItem.query.filter_by(business_id=business.id).order_by(ComplianceItem.due_date).all()
+    busy = open_filing_ids([filing.id for filing in filings])
+
+    result = []
+    for filing in filings:
+        options = services_for(profile, business, filing)
+        reason = None
+
+        if filing.status in ("filed", "filed_verified"):
+            reason = "Already filed."
+
+        elif filing.id in busy:
+            reason = "Already requested from a CA or with a CA."
+
+        elif not options and filing.form_code == "itr":
+            reason = "This CA has not listed a price for the ITR of your business type."
+
+        elif not options:
+            reason = "This CA has not listed a price for this filing."
+
+
+        result.append({"id": str(filing.id), 
+                       "form_code": filing.form_code, 
+                       "period_label": filing.period_label,
+                       "due_date": iso(filing.due_date), 
+                       "status": filing.status, 
+                       "options": options,
+                       "blocked_reason": reason})
+        
+    return jsonify(result)
+
+
+
+
+@app.route("/api/v1/marketplace/engagements", methods=["POST"])
+@role_required("business")
+def send_request():
+    data = request.get_json(silent=True) or {}
+    business, profile = my_business(), listed_ca(as_uuid(data.get("ca_profile_id")))
+    items = data.get("items")
+
+    if not isinstance(items, list) or not items:
+        return error(422, "VALIDATION_ERROR", "Choose at least one filing.")
+    
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first.")
+
+    
+    if profile is None:
+        return error(404, "CA_NOT_FOUND", "This CA is not listed on the marketplace.")
+    
+    if is_full(profile, business.id):
+        return error(409, "CA_AT_CAPACITY", FULL_MESSAGE)
+
+    chosen = [] 
+    for item in items:
+        item = item if isinstance(item, dict) else {}
+        filing_id = as_uuid(item.get("compliance_item_id"))
+        filing = db.session.get(ComplianceItem, filing_id) if filing_id else None
+
+        service_id = item.get("service_id")
+
+
+        if filing is None or filing.business_id != business.id:
+            return error(404, "FILING_NOT_FOUND", "One of the filings was not found.")
+        
+        if filing in [row[0] for row in chosen]:
+            return error(400, "DUPLICATE_FILING", "The same filing is in the request twice.")
+        
+        if filing.status in ("filed", "filed_verified"):
+            return error(409, "FILING_ALREADY_FILED", f"{filing.period_label} is already filed.")
+        
+        if open_filing_ids([filing.id]):
+            message = f"{filing.period_label} is already requested from a CA or with a CA."
+            return error(409, "FILING_ALREADY_REQUESTED", message)
+
+        
+        option = [o for o in services_for(profile, business, filing) if o["service_id"] == service_id]
+
+        if not option:
+            return error(400, "SERVICE_NOT_OFFERED", "This CA does not offer that service for this filing.")
+
+        
+        chosen.append((filing, as_uuid(service_id), read_amount(option[0]["price"], 0, 10**9)))
+
+    engagement = Engagement(business_id=business.id, ca_profile_id=profile.id, status="requested", requested_at=db_now())
+    db.session.add(engagement)
+    db.session.flush()
+
+
+    for filing, service_id, price in chosen:
+        db.session.add(EngagementItem(engagement_id=engagement.id, compliance_item_id=filing.id, service_id=service_id, listed_price=price))
+
+
+    notify(profile.user,
+            "engagement_update", 
+            f"New request from {business.legal_name}",
+            f"{business.legal_name} asked you to handle {len(chosen)} filing(s). Accept or decline it.",
+            "/ca/engagements")
+
+    
+    db.session.commit()
+
+    if profile.user.email_notifications:
+        send_email(profile.user.email,
+                    "New request on CA Helper",
+                    "engagement_requested",
+                    ca_name=profile.user.full_name, 
+                    business_name=business.legal_name, 
+                    filing_count=len(chosen))
+
+        
+    return jsonify(engagement_to_dict(engagement)), 201
+
+
+
+
+@app.route("/api/v1/marketplace/my-engagements")
+@role_required("business")
+def my_engagements():
+    business = my_business()
+
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first.")
+
+    
+    engagements = Engagement.query.filter_by(business_id=business.id).order_by(Engagement.requested_at.desc())
+
+    return jsonify([engagement_to_dict(engagement) for engagement in engagements])
+
+
+
+
+@app.route("/api/v1/marketplace/ca-engagements")
+@role_required("ca")
+def ca_engagements():
+    profile = my_profile()
+
+    if profile is None:
+        return jsonify([])
+    
+    engagements = Engagement.query.filter_by(ca_profile_id=profile.id).order_by(Engagement.requested_at.desc())
+    return jsonify([engagement_to_dict(engagement) for engagement in engagements])
