@@ -447,3 +447,34 @@ export function useCaServices() {
 export function saveCaServices(items) {
   return apiFetch("/api/v1/marketplace/ca-services", { method: "PUT", body: { items } });
 }
+
+
+
+export const MY_ENGAGEMENTS_KEY = ["marketplace", "my-engagements"];
+export const CA_ENGAGEMENTS_KEY = ["marketplace", "ca-engagements"];
+export const REQUESTABLE_KEY = ["marketplace", "requestable-filings"];
+
+
+export function useRequestableFilings(caId) {
+  const path = "/api/v1/marketplace/cas/" + caId + "/requestable-filings";
+  return useGet([...REQUESTABLE_KEY, caId], path, { notFound: "BUSINESS_NOT_FOUND" });
+}
+
+
+export function sendRequest(caId, items) {
+  return apiFetch("/api/v1/marketplace/engagements", {
+    method: "POST",
+    body: { ca_profile_id: caId, items },
+  });
+}
+
+
+export function useMyEngagements() {
+  const path = "/api/v1/marketplace/my-engagements";
+  return useGet(MY_ENGAGEMENTS_KEY, path, { notFound: "BUSINESS_NOT_FOUND" });
+}
+
+
+export function useCaEngagements() {
+  return useGet(CA_ENGAGEMENTS_KEY, "/api/v1/marketplace/ca-engagements");
+}

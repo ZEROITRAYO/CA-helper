@@ -1,8 +1,9 @@
-import { Link, useLocation, useParams, useSearchParams } from "react-router";
-import { useServices, useVerifiedCa, useVerifiedCas } from "@/api";
-import { BackLink, caFacts, Field, Options, PageTitle, Pager, QueryStatus, RatingSummary, Row, Section, SpecializationBadges, Stars, Table, VerifiedBadge } from "@/components/shared";
+import { useState } from "react";
+import { Link, useLocation, useParams, useSearchParams, useNavigate } from "react-router";
+import { MY_ENGAGEMENTS_KEY, REQUESTABLE_KEY, useServices, useVerifiedCa, useVerifiedCas, sendRequest, useRefresh, useRequestableFilings } from "@/api";
+import { BackLink, caFacts, ErrorText, Field, Options, PageTitle, Pager, QueryStatus, RatingSummary, RegisterFirst,Row, Section, SpecializationBadges, Stars, Table, useAction, VerifiedBadge } from "@/components/shared";
 import { Button, buttonClass, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Select} from "@/components/ui";
-import { CA_LANGUAGE_LABELS, CA_SPECIALIZATION_LABELS, formatDateTime, formatRupees, label, labelList, SERVICE_UNIT_LABELS } from "@/lib";
+import { CA_LANGUAGE_LABELS, CA_SPECIALIZATION_LABELS, formatDateTime, formatRupees, label, filingFormLabel, formatDate, labelList, SERVICE_UNIT_LABELS } from "@/lib";
 
 
 const FILTERS = ["service", "specialization", "language", "city"];
@@ -269,5 +270,262 @@ function CaDetails({ ca }) {
 
       </Section>
     </>
+  );
+}
+
+
+
+
+export function RequestCaPage() {
+  const { caId } = useParams();
+  const ca = useVerifiedCa(caId);
+  const filings = useRequestableFilings(caId);
+
+  let content = <QueryStatus query={[ca, filings]} />;
+  if (ca.isSuccess && filings.isSuccess){
+
+    if (filings.data === null) {
+      content = <RegisterFirst>first, so we know which filings you have.</RegisterFirst>;
+    } 
+    
+    else if (filings.data.length === 0) {
+      content = <p className="text-sm">You have no filings due for the rest of this year.</p>;
+    } 
+    
+    else {
+      content = <RequestForm caId={caId} filings={filings.data} />;
+    }
+    
+  }
+
+
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <BackLink to={"/business/marketplace/" + caId}>Back to the CA</BackLink>
+
+      <PageTitle title={"Request " + (ca.isSuccess ? ca.data.full_name : "this CA")}>
+        Tick the filings you want this CA to do. The CA can accept at these fixed prices or decline.
+      </PageTitle>
+
+      {content}
+    </div>
+  );
+}
+
+
+
+function priceOf(filing, serviceId) {
+  const option = filing.options.find((one) => one.service_id === serviceId);
+  return option ? Number(option.price) : 0;
+}
+
+
+
+function RequestForm({ caId, filings }) {
+  const navigate = useNavigate();
+  const refresh = useRefresh();
+  const [chosen, setChosen] = useState({});
+  const { busy, error, run } = useAction();
+  const ticked = filings.filter((filing) => chosen[filing.id]);
+  const total = ticked.reduce((sum, filing) => sum + priceOf(filing, chosen[filing.id]), 0);
+
+  function toggle(filing) {
+    const next = { ...chosen };
+
+    if (next[filing.id]) {
+      delete next[filing.id];
+    }
+    
+    else {
+      next[filing.id] = filing.options[0].service_id;
+    }
+    setChosen(next);
+  }
+
+  
+
+  function selectAll(group) {
+    const next = { ...chosen };
+    for (const filing of group) {
+      if (filing.blocked_reason === null && !next[filing.id]) {
+        next[filing.id] = filing.options[0].service_id;
+      }
+    }
+
+    setChosen(next);
+  }
+
+
+
+  async function onSend() {
+    const items = ticked.map((filing) => ({ compliance_item_id: filing.id, service_id: chosen[filing.id] }));
+    const sent = await run(() => sendRequest(caId, items));
+    if (sent) {
+      refresh(MY_ENGAGEMENTS_KEY, REQUESTABLE_KEY);
+      navigate("/business/engagements", { state: { sent: true } });
+    }
+  }
+
+  
+  const offered = filings.filter((filing) => filing.options.length > 0);
+  const notOffered = filings.filter((filing) => filing.options.length === 0);
+
+  function filingRow(filing) {
+    return (
+      <li key={filing.id} className="rounded-lg border p-3 text-sm">
+
+        <label htmlFor={"filing-" + filing.id} className="flex items-center gap-2 font-medium">
+          <input
+            id={"filing-" + filing.id}
+            type="checkbox"
+            value={filing.id}
+            checked={Boolean(chosen[filing.id])}
+            disabled={filing.blocked_reason !== null}
+            onChange={() => toggle(filing)}
+          />
+          {filingFormLabel(filing.form_code, filing.period_label)} {filing.period_label}
+          <span className="font-normal text-hint">· due {formatDate(filing.due_date)}</span>
+        </label>
+
+
+        {filing.blocked_reason ? (
+          <p className="mt-1 text-hint">{filing.blocked_reason}</p>
+        ) : (
+          <FilingPrice
+            filing={filing}
+            serviceId={chosen[filing.id] || filing.options[0].service_id}
+            onChoose={(serviceId) => setChosen({ ...chosen, [filing.id]: serviceId })}
+          />
+        )}
+
+
+      </li>
+    );
+  }
+
+
+
+  return (
+    <div className="space-y-4">
+      {groupByQuarter(offered).map((group) => (
+        <section key={group.quarter} className="space-y-2">
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-medium">Due in {group.quarter}</h2>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => selectAll(group.filings)}
+              disabled={group.filings.every((filing) => filing.blocked_reason !== null)}
+            >
+              Select all in {group.quarter.split(" ")[0]}
+            </Button>
+
+          </div>
+          <ul className="space-y-2">{group.filings.map(filingRow)}</ul>
+
+        </section>
+      ))}
+
+
+      {notOffered.length > 0 && (
+        <details className="rounded-lg border p-3">
+
+          <summary className="cursor-pointer text-sm font-medium">
+            Not offered by this CA ({notOffered.length})
+          </summary>
+
+          <ul className="mt-2 space-y-2">{notOffered.map(filingRow)}</ul>
+        </details>
+      )}
+
+      <p className="text-sm font-medium">Total at the listed prices: {formatRupees(total)}</p>
+      <ErrorText>{error}</ErrorText>
+
+      <div className="flex flex-wrap items-center gap-3">
+
+        <Button onClick={onSend} disabled={busy || ticked.length === 0}>
+          {busy ? "Sending..." : "Send request"}
+        </Button>
+
+        <p className="text-sm text-hint">
+          {ticked.length === 0 ? "Tick at least one filing. " : ""}
+          The CA accepts or declines it;
+          you can withdraw it until then.
+        </p>
+
+
+      </div>
+    </div>
+  );
+}
+
+
+
+function quarterOf(isoDate) {
+  const year = isoDate.slice(0, 4);
+  const month = Number(isoDate.slice(5, 7)); 
+  if(month >= 4 && month <= 6){
+    return "Q1 (Apr-Jun " + year + ")"; 
+  }
+  if (month >= 7 && month <= 9){
+    return "Q2 (Jul-Sep " + year + ")";
+  } 
+  if (month >= 10){
+    return "Q3 (Oct-Dec " + year + ")";
+  }
+
+  return "Q4 (Jan-Mar " + year + ")";
+}
+
+
+
+
+function groupByQuarter(filings) {
+  const groups = [];
+  for (const filing of filings) {
+    const quarter = quarterOf(filing.due_date);
+    const last = groups[groups.length - 1];
+
+    if (last && last.quarter === quarter) {
+      last.filings.push(filing);
+    } 
+    
+    else {
+      groups.push({ quarter, filings: [filing] });
+    }
+
+  }
+  return groups;
+}
+
+
+
+function FilingPrice({ filing, serviceId, onChoose }) {
+  if (filing.options.length === 1) {
+    const option = filing.options[0];
+    return (
+      <p className="mt-1">
+        {option.name}: <span className="font-medium">{formatRupees(option.price)}</span>
+      </p>
+    );
+  }
+  return (
+    <select
+      aria-label={"Service for " + filing.period_label}
+      className="mt-1 h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+      value={serviceId}
+      onChange={(event) => onChoose(event.target.value)}
+    >
+      {filing.options.map((option) => (
+        <option key={option.service_id} value={option.service_id}>
+          {option.name}: {formatRupees(option.price)}
+        </option>
+      ))}
+    </select>
+    
   );
 }
