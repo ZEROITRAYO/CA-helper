@@ -2,7 +2,7 @@ import re
 from flask import jsonify, request
 from app import app
 from helpers import as_uuid, current_user, error, iso, my_business,money, read_amount, read_upload, remove_document, role_required, save_document, send_email, notify
-from models import CaProfile, CaService, CatalogService, ComplianceItem, Engagement, EngagementItem, RegulatoryProfile ,Rating, db, db_now
+from models import CaProfile, CaService, CatalogService, ComplianceItem, Engagement, EngagementItem, RegulatoryProfile ,Rating, User, db, db_now
 from filings import open_filing_ids
 
 
@@ -493,3 +493,146 @@ def ca_engagements():
     
     engagements = Engagement.query.filter_by(ca_profile_id=profile.id).order_by(Engagement.requested_at.desc())
     return jsonify([engagement_to_dict(engagement) for engagement in engagements])
+
+
+
+
+
+def find_engagement(engagement_id, status):
+    engagement = db.session.get(Engagement, engagement_id)
+    user = current_user()
+
+    if engagement and user.role == "ca":
+        mine = engagement.ca.user_id == user.id
+
+    else:
+        mine = engagement is not None and engagement.business.user_id == user.id
+
+    if not mine:
+        return None, error(404, "ENGAGEMENT_NOT_FOUND", "This engagement was not found.")
+    
+    if engagement.status != status:
+        message = f"This engagement is {engagement.status}, so this is no longer possible."
+        return None, error(409, "INVALID_STATUS", message)
+
+    
+    return engagement, None
+
+
+
+
+def tell_business(engagement, title, text, email_template=None):
+    owner = db.session.get(User, engagement.business.user_id)
+    notify(owner, "engagement_update", title, f"{engagement.ca.user.full_name} {text}", "/business/engagements")
+    
+    db.session.commit()
+
+    if email_template and owner.email_notifications:
+        send_email(owner.email, 
+                   title, 
+                   email_template, 
+                   owner_name=owner.full_name, 
+                   ca_name=engagement.ca.user.full_name)
+        
+    return jsonify(engagement_to_dict(engagement))
+
+
+
+
+@app.route("/api/v1/marketplace/engagements/<uuid:engagement_id>/accept", methods=["POST"])
+@role_required("ca")
+def accept_request(engagement_id):
+    engagement, problem = find_engagement(engagement_id, "requested")
+
+    if problem:
+        return problem
+    
+    if is_full(engagement.ca, engagement.business_id):
+        return error(409, "CA_AT_CAPACITY", FULL_MESSAGE)
+    
+    for item in EngagementItem.query.filter_by(engagement_id=engagement.id):
+        item.agreed_price = item.listed_price
+        item.filing.status, item.filing.filing_path = "with_ca", "ca"
+
+    engagement.status, engagement.responded_at, engagement.activated_at = "active", db_now(), db_now()
+
+    return tell_business(engagement,
+                        "Your CA accepted your request",
+                        "accepted your request at their listed prices. The work has started.", 
+                        "engagement_accepted")
+
+
+
+
+@app.route("/api/v1/marketplace/engagements/<uuid:engagement_id>/decline", methods=["POST"])
+@role_required("ca")
+def decline_request(engagement_id):
+    engagement, problem = find_engagement(engagement_id, "requested")
+    if problem:
+        return problem
+    engagement.status, engagement.responded_at = "declined", db_now()
+    return tell_business(engagement,
+                        "Your CA declined your request",
+                        'declined your request. You can ask another CA in "Find a CA".', 
+                        "engagement_declined")
+
+
+@app.route("/api/v1/marketplace/engagements/<uuid:engagement_id>/complete", methods=["POST"])
+@role_required("ca")
+def complete_engagement(engagement_id):
+    engagement, problem = find_engagement(engagement_id, "active")
+    if problem:
+        return problem
+    engagement.status, engagement.completed_at = "completed", db_now()
+    return tell_business(engagement, 
+                         "Your CA completed the work",
+                         'marked the work as completed. You can rate it in "My engagements".')
+
+
+
+
+@app.route("/api/v1/marketplace/engagements/<uuid:engagement_id>/withdraw", methods=["POST"])
+@role_required("business")
+def withdraw_request(engagement_id):
+    engagement, problem = find_engagement(engagement_id, "requested")
+    if problem:
+        return problem
+    
+    engagement.status = "cancelled"
+    notify(engagement.ca.user, 
+           "engagement_update", 
+           f"{engagement.business.legal_name} withdrew their request",
+           "You do not need to answer it any more.",
+            "/ca/engagements")
+    db.session.commit()
+    return jsonify(engagement_to_dict(engagement))
+
+
+
+
+
+@app.route("/api/v1/marketplace/engagements/<uuid:engagement_id>/rating", methods=["POST"])
+@role_required("business")
+def rate_engagement(engagement_id):
+    data = request.get_json(silent=True) or {}
+    stars, review = data.get("stars"), str(data.get("review") or "").strip()
+
+    if type(stars) is not int or not 1 <= stars <= 5:
+        return error(422, "VALIDATION_ERROR", "Choose 1 to 5 stars.")
+    
+    if len(review) > 2000:
+        return error(422, "VALIDATION_ERROR", "The review is too long (2000 characters at most).")
+    
+    engagement, problem = find_engagement(engagement_id, "completed")
+
+    if problem:
+        return problem
+    
+    if Rating.query.filter_by(engagement_id=engagement.id).first():
+        return error(409, "ALREADY_RATED", "You have already rated this CA for this work.")
+
+    
+    db.session.add(Rating(engagement_id=engagement.id, stars=stars, review=review or None))
+    db.session.commit()
+
+    return jsonify(engagement_to_dict(engagement))
