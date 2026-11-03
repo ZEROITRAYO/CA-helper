@@ -5,7 +5,7 @@ import { useParams, Link } from "react-router";
 import { DASHBOARD_KEY, filingKey, FILINGS_KEY, tickChecklist, useFiling, useRefresh, DOCUMENTS_KEY,
         downloadDocument, linkDocument, unlinkDocument, useDocuments, UPLOAD_TYPES, uploadDocument, errorMessage,
         useMyDocumentRequests,fulfilDocumentRequest, CA_WORKSPACE_KEY, usePeerInsights, chooseFilingPath, markFiled, 
-        unmarkFiled, useAcknowledgementFile} from "@/api";
+        unmarkFiled, useAcknowledgementFile, useMyEngagements} from "@/api";
 
 import { BackLink, ErrorText, QueryStatus, Section, StatusBadge, useAction, Field, Options, FormField, useObjectUrl} from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, Button, Input, Select, } from "@/components/ui";
@@ -590,16 +590,50 @@ function PeerPath({ title, figures }) {
 }
 
 const OPEN_FOR_BUSINESS = ["upcoming", "docs_pending", "ready", "overdue"];
-
+const OPEN_ENGAGEMENTS = ["requested", "active"];
 
 function HowToFile({ page, onUpdated }) {
   
-  if (FILED.includes(page.filing.status)) 
-  {
+  const item = page.filing;
+  const engagements = useMyEngagements();
+
+  const engagement = (engagements.data || []).find((candidate) => OPEN_ENGAGEMENTS.includes(candidate.status) &&
+      candidate.items.some((engagementItem) => engagementItem.compliance_item_id === item.id),);
+
+  if (FILED.includes(item.status)) {
     return <Filed page={page} onUpdated={onUpdated} />;
   }
 
-  return <ChoosePath page={page} onUpdated={onUpdated} />;
+  if (!engagement && item.status !== "with_ca") {
+    return <ChoosePath page={page} onUpdated={onUpdated} />;
+  }
+
+  let text = "A CA is working on this filing, They will mark it as filed";
+
+  if (engagement && engagement.status === "active") 
+  {
+    text = `${engagement.ca_name} is working on this filing, They will mark it as filed`;
+  } 
+  
+  else if (engagement) 
+  {
+    text = `Your request to ${engagement.ca_name} is waiting for an answer`;
+  }
+
+  return (
+    <Section title="With a CA"
+      description={
+        <>
+          {text}{" "}
+          
+          <Link to="/business/engagements" className="text-primary hover:underline">
+            See my engagements
+          </Link>
+
+        </>
+      }
+    />
+  );
 }
 
 

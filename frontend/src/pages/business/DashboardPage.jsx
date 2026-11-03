@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 
-import { useComplianceDashboard, useFilings, useMyDocumentRequests } from "@/api";
+import { useComplianceDashboard, useFilings, useMyDocumentRequests, useMyEngagements } from "@/api";
 import { NumberCard, RegisterFirst, Welcome } from "@/components/shared";
 import { daysLeftText, daysUntil, filingFormLabel, formatDate } from "@/lib";
 
@@ -9,6 +9,8 @@ const DONE = ["filed", "filed_verified"];
 export function BusinessDashboardPage() {
   const dashboard = useComplianceDashboard();
   const filings = useFilings();
+  const engagements = useMyEngagements();
+
   
   return (
     <div className="space-y-6">
@@ -19,7 +21,7 @@ export function BusinessDashboardPage() {
       
       {dashboard.data?.registered && <Numbers numbers={dashboard.data} />}
 
-      {filings.data && <ToDo filings={filings.data} />}
+      {filings.data && <ToDo filings={filings.data} engagements={engagements.data || []} />}
     
     </div>
   );
@@ -69,7 +71,7 @@ function Numbers({ numbers }) {
   );
 }
 
-function ToDo({ filings }) {
+function ToDo({ filings, engagements }) {
   const tasks = [];
   const requests = useMyDocumentRequests();
 
@@ -81,6 +83,16 @@ function ToDo({ filings }) {
       
       to: `/business/compliance/${request.compliance_item_id}`,
     });
+  }
+
+  for (const engagement of engagements) {
+    if (engagement.status === "requested") 
+    {
+      tasks.push({ key: engagement.id,
+        text: `Waiting for ${engagement.ca_name} to answer your request`,
+        to: "/business/engagements",
+      });
+    }
   }
   
   const overdue = filings.filter((item) => {
