@@ -73,3 +73,4 @@ import routes_business
 import routes_marketplace
 import routes_admin  
 import routes_documents
+import routes_ca  
