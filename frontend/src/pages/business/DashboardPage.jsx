@@ -1,8 +1,8 @@
 import { Link } from "react-router";
 
-import { useComplianceDashboard, useFilings, useMyDocumentRequests, useMyEngagements } from "@/api";
+import { useComplianceDashboard, useFilings, useMyDocumentRequests, useMyEngagements, usePenaltyExposure} from "@/api";
 import { NumberCard, RegisterFirst, Welcome } from "@/components/shared";
-import { daysLeftText, daysUntil, filingFormLabel, formatDate } from "@/lib";
+import { daysLeftText, daysUntil, filingFormLabel, formatDate, formatRupees} from "@/lib";
 
 const DONE = ["filed", "filed_verified"];
 
@@ -21,6 +21,8 @@ export function BusinessDashboardPage() {
       
       {dashboard.data?.registered && <Numbers numbers={dashboard.data} />}
 
+      {dashboard.data?.registered && dashboard.data.overdue > 0 && <PenaltyExposure />}
+      
       {filings.data && <ToDo filings={filings.data} engagements={engagements.data || []} />}
     
     </div>
@@ -70,6 +72,7 @@ function Numbers({ numbers }) {
     </div>
   );
 }
+
 
 function ToDo({ filings, engagements }) {
   const tasks = [];
@@ -166,4 +169,24 @@ function ToDo({ filings, engagements }) {
       )}
     </section>
   );
+}
+
+function PenaltyExposure() {
+  
+  const exposure = usePenaltyExposure(true);
+  
+  if (!exposure.isSuccess) return null;
+  
+  const data = exposure.data;
+  
+  const value = data.estimated_count > 0 ? formatRupees(data.total_late_fees) : "Not available yet";
+  
+  let note = "late fees of your overdue filings (interest not included)";
+  
+  if (data.pending_count > 0) 
+  {
+    note += `; ${data.pending_count} of ${data.overdue_count} have no confirmed rule yet`;
+  }
+  
+  return <NumberCard title={"Penalty exposure · " + data.label} value={value} note={note} alert />;
 }

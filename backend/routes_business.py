@@ -1,6 +1,7 @@
 import re
 
 from flask import jsonify, request
+from decimal import Decimal
 
 import ocr
 from app import app
@@ -9,7 +10,7 @@ from helpers import (
     GST_STATES, current_user, error, format_inr, gstin_error, iso, money, my_business, read_amount,
     read_upload, role_required, state_code, now, remove_document, send_document, date
 )
-from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now, ComplianceItem, Document
+from models import Business, NicCode, RegulatoryProfile, RuleThreshold, db, db_now, ComplianceItem, Document, PenaltyRule
 
 
 ENTITY_TYPES = ("individual", "proprietorship", "partnership", "llp", "private_limited")
@@ -537,3 +538,107 @@ def peer_insights(item_id):
     
     return jsonify(result)
 
+
+def estimate(filing, today, tax_due=None):
+    days_late = max((today - filing.due_date).days, 0)
+
+    result = {"compliance_item_id": str(filing.id), "form_code": filing.form_code,
+              "period_label": filing.period_label, "due_date": iso(filing.due_date), "days_late": days_late,
+              "status": "pending", "late_fee": None, "interest": None, "total": None, "notes": [],
+              "label": "Estimate (rules pending verification)"}
+    
+    if filing.status in DONE:
+        result.update(status="filed", days_late=0)
+        return result
+    
+    if days_late == 0:
+        result["status"] = "not_late"
+        return result
+    
+    rule = (PenaltyRule.query.filter(PenaltyRule.form_code == filing.form_code,PenaltyRule.effective_from <= filing.due_date)
+                        .order_by(PenaltyRule.effective_from.desc()).first())  
+    
+    if rule is None or (rule.effective_to and rule.effective_to <= filing.due_date):
+        result["notes"].append("There is no penalty rule for this form yet")
+        return result
+    
+    if "TODO_VERIFY" not in rule.source_reference:
+        result["label"] = "Estimate"
+
+    late_fee = rule.flat_late_fee 
+
+    if late_fee is None and rule.late_fee_per_day is not None:
+        late_fee = rule.late_fee_per_day * days_late
+
+        if rule.max_late_fee is not None:
+            late_fee = min(late_fee, rule.max_late_fee)
+
+    if late_fee is None:
+        result["notes"].append("The late fee for this form is not confirmed yet")
+
+    interest = None
+
+    if rule.annual_interest_rate is None:
+        result["notes"].append("The interest rate is not confirmed yet")
+
+    elif tax_due is None:
+        result["notes"].append("Enter the tax due to estimate the interest")
+
+    else:
+        interest = tax_due * rule.annual_interest_rate / 100 * days_late / 365
+
+    amounts = [amount for amount in (late_fee, interest) if amount is not None]
+
+    if amounts:
+        result.update(status="estimated", total=money(sum(amounts)))
+
+    result.update(late_fee=money(late_fee), interest=money(interest))
+    
+    return result
+
+
+@app.route("/api/v1/alerts/penalties")
+@role_required("business")
+def penalty_exposure():
+    
+    business = my_business()
+    
+    if business is None:
+        return error(404, "BUSINESS_NOT_FOUND", "Register your business first")
+    
+    today = now()
+    
+    items = []
+
+    for filing in ComplianceItem.query.filter_by(business_id=business.id).order_by(ComplianceItem.due_date):
+        if filing.status not in DONE and filing.due_date < today:
+            items.append(estimate(filing, today))
+    
+    fees = [Decimal(item["late_fee"]) for item in items if item["late_fee"] is not None]
+    
+    verified = items and all(item["label"] == "Estimate" for item in items)
+    
+    return jsonify({"total_late_fees": money(sum(fees)), "overdue_count": len(items),
+                    "estimated_count": len(fees), "pending_count": len(items) - len(fees),
+                    "label": "Estimate" if verified else "Estimate (rules pending verification)",
+                    "items": items})
+
+
+@app.route("/api/v1/alerts/penalties/<uuid:item_id>")
+@role_required("business")
+def penalty_estimate(item_id):
+    
+    filing, problem = find_filing(item_id)
+    
+    if problem:
+        return problem
+    
+    tax_due = None
+    
+    if "tax_due" in request.args:
+        tax_due = read_amount(request.args["tax_due"], 0, 10**10)
+    
+        if tax_due is None:
+            return error(422, "VALIDATION_ERROR", "Enter the tax due in rupees")
+    
+    return jsonify(estimate(filing, now(), tax_due))
