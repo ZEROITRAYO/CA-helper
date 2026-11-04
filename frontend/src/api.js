@@ -361,6 +361,23 @@ export function fulfilDocumentRequest(requestId, documentId) {
   return apiFetch(path, { method: "POST", body: { document_id: documentId } });
 }
 
+export function usePenaltyEstimate(itemId, taxDue, enabled) {
+ 
+  const query = taxDue ? `?tax_due=${encodeURIComponent(taxDue)}` : "";
+ 
+  const path = `/api/v1/alerts/penalties/${itemId}${query}`;
+ 
+  return useGet(["alerts", "penalty", itemId, taxDue], path, { enabled });
+}
+
+
+export function usePenaltyExposure(enabled) 
+{
+  return useGet(["alerts", "penalties"], "/api/v1/alerts/penalties", { enabled });
+}
+
+
+
 export const ADMIN_CAS_KEY = ["admin", "cas"];
 export const ADMIN_STATS_KEY = ["admin", "stats"];
 

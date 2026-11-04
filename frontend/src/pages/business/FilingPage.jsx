@@ -5,11 +5,12 @@ import { useParams, Link } from "react-router";
 import { DASHBOARD_KEY, filingKey, FILINGS_KEY, tickChecklist, useFiling, useRefresh, DOCUMENTS_KEY,
         downloadDocument, linkDocument, unlinkDocument, useDocuments, UPLOAD_TYPES, uploadDocument, errorMessage,
         useMyDocumentRequests,fulfilDocumentRequest, CA_WORKSPACE_KEY, usePeerInsights, chooseFilingPath, markFiled, 
-        unmarkFiled, useAcknowledgementFile, useMyEngagements} from "@/api";
+        unmarkFiled, useAcknowledgementFile, useMyEngagements, usePenaltyEstimate} from "@/api";
 
 import { BackLink, ErrorText, QueryStatus, Section, StatusBadge, useAction, Field, Options, FormField, useObjectUrl} from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, Button, Input, Select, } from "@/components/ui";
-import { daysLeftText, filingFormLabel, formatDate, DOCUMENT_TYPE_LABELS, label, ENTITY_TYPE_LABELS, MSME_TIER_LABELS, formatDateTime} from "@/lib";
+import { daysLeftText, filingFormLabel, formatDate, DOCUMENT_TYPE_LABELS, label, ENTITY_TYPE_LABELS, MSME_TIER_LABELS, formatDateTime,
+         daysUntil, formatRupees} from "@/lib";
 
 
 const FILED = ["filed", "filed_verified"];
@@ -432,6 +433,9 @@ export function FilingPage() {
       {filing.isSuccess && (
         <>
           <Header page={filing.data} />
+
+          { !FILED.includes(filing.data.filing.status) &&
+            daysUntil(filing.data.filing.due_date) < 0 && <Penalty item={filing.data.filing} />}
           
           <HowToFile page={filing.data} onUpdated={showUpdated} />
           
@@ -814,6 +818,69 @@ function Filed({ page, onUpdated }) {
 
       <ErrorText>{error}</ErrorText>
 
+    </Section>
+  );
+}
+
+
+function Penalty({ item }) {
+  const [taxDue, setTaxDue] = useState("");
+
+  const [askedTaxDue, setAskedTaxDue] = useState("");
+
+  const estimate = usePenaltyEstimate(item.id, askedTaxDue, true);
+
+  const amount = (value) => (value === null ? "not available" : formatRupees(value));
+
+  function onSubmit(event) {
+    event.preventDefault();
+    setAskedTaxDue(taxDue.trim());
+  }
+
+  return (
+    <Section
+      title="Late fees and interest"
+      description={estimate.data?.label ?? "Estimate (rules pending verification)"}
+      className="ring-red-300"
+      contentClassName="space-y-3 text-sm"
+    >
+      <QueryStatus query={estimate} />
+
+      {estimate.isSuccess && (
+        <div className="space-y-1">
+
+          <p>{estimate.data.days_late} days late.</p>
+
+          <p>Late fee: {amount(estimate.data.late_fee)}</p>
+
+          <p>Interest: {amount(estimate.data.interest)}</p>
+
+          {estimate.data.total !== null && (
+            <p className="font-medium">Total: {formatRupees(estimate.data.total)}</p>
+          )}
+
+          {estimate.data.notes.map((note) => (
+            <p key={note} className="text-hint">
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <form className="flex flex-wrap items-end gap-2" onSubmit={onSubmit}>
+        <FormField
+          id="tax_due"
+          label="Tax due (Optional)"
+          inputMode="decimal"
+          value={taxDue}
+          onChange={(event) => setTaxDue(event.target.value)}
+        />
+
+        <Button type="submit" variant="outline">
+          Estimate
+        </Button>
+
+      </form>
     </Section>
   );
 }
