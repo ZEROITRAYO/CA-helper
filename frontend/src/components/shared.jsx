@@ -352,3 +352,151 @@ export function RatingSummary({ average, count }) {
     </span>
   );
 }
+
+
+
+
+
+const STATUS_COLORS = {
+  requested: "bg-amber-100 text-amber-800",
+  active: "bg-green-100 text-green-700",
+  completed: "bg-gray-100 text-gray-700",
+  declined: "bg-red-100 text-red-700",
+  cancelled: "bg-gray-100 text-gray-700",
+};
+
+
+function Timeline({ status }) {
+  const ended = status === "declined" || status === "cancelled";
+  const steps = ended ? ["requested", status] : ["requested", "active", "completed"];
+  const current = steps.indexOf(status);
+
+  return (
+    <ol aria-label="Progress" className="flex flex-wrap items-center gap-1 text-xs">
+      {steps.map((step, index) => (
+        <li
+          key={step}
+          aria-current={index === current ? "step" : undefined}
+          className={cn(
+            index === current && "font-semibold",
+            index < current && "text-hint",
+            index > current && "text-hint/60",
+          )}>
+        
+          {index > 0 && <span aria-hidden="true">→ </span>}
+          {index < current ? "✓ " : index === current ? "● " : "○ "}
+          {label(ENGAGEMENT_STATUS_LABELS, step)}
+        </li>
+
+      ))}
+    </ol>
+  );
+}
+
+
+
+function EngagementCard({ engagement, title, children }) {
+  const items = engagement.items;
+  const total = items.reduce((sum, item) => sum + Number(item.listed_price), 0);
+
+  return (
+    <Card>
+      <CardHeader>
+
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <h3>{title}</h3>
+          <Badge className={STATUS_COLORS[engagement.status]}>
+            {label(ENGAGEMENT_STATUS_LABELS, engagement.status)}
+          </Badge>
+        </CardTitle>
+
+        <CardDescription>Requested {formatDateTime(engagement.requested_at)}</CardDescription>
+        <Timeline status={engagement.status} />
+      </CardHeader>
+
+
+      <CardContent className="space-y-3 text-sm">
+        <table className="w-full text-left">
+          <thead className="border-b text-hint">
+            <tr>
+              <th className="py-1 pr-3 font-medium">Filing</th>
+              <th className="py-1 pr-3 font-medium">Service</th>
+              <th className="py-1 font-medium">Price</th>
+            </tr>
+          </thead>
+
+          
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id} className="border-b">
+                <td className="py-1 pr-3">
+
+                  {item.form_code
+                    ? filingFormLabel(item.form_code, item.period_label)
+                    : "Removed filing"}{" "}
+                  {item.period_label}
+                  {item.due_date && (
+                    <span className="text-hint"> · due {formatDate(item.due_date)}</span>
+                  )}
+
+
+                </td>
+                <td className="py-1 pr-3">{item.service_name}</td>
+                <td className="py-1">{formatRupees(item.listed_price)}</td>
+              </tr>
+            ))}
+
+          </tbody>
+
+
+          <tfoot className="font-medium">
+            <tr>
+              <td className="py-1 pr-3" colSpan={2}> Total </td>
+              <td className="py-1">{formatRupees(total)}</td>
+
+            </tr>
+
+          </tfoot>
+        </table>
+
+
+        {engagement.rating && (
+          <p>
+            <span className="font-medium">Rating: </span>
+            <Stars stars={engagement.rating.stars} />
+            {engagement.rating.review && <span> “{engagement.rating.review}”</span>}
+          </p>
+        )}
+
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+export function EngagementGroups({ engagements, waitingTitle, titleOf, actions }) {
+  const groups = [
+    [waitingTitle, ["requested"]],
+    ["Active", ["active"]],
+    ["Finished", ["completed", "declined", "cancelled"]],
+  ];
+
+
+  return groups.map(([title, statuses]) => {
+    const inGroup = engagements.filter((engagement) => statuses.includes(engagement.status));
+    if (inGroup.length === 0) return null;
+
+    return (
+      <section key={title} className="space-y-3">
+        <h2 className="text-lg font-semibold">{title}</h2>
+
+        {inGroup.map((engagement) => (
+          <EngagementCard key={engagement.id} engagement={engagement} title={titleOf(engagement)}> {actions(engagement)} </EngagementCard>
+        ))}
+
+
+      </section>
+    );
+  });
+}

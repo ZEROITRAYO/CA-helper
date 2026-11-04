@@ -478,3 +478,11 @@ export function useMyEngagements() {
 export function useCaEngagements() {
   return useGet(CA_ENGAGEMENTS_KEY, "/api/v1/marketplace/ca-engagements");
 }
+
+
+export function engagementAction(engagementId, action, body) {
+  return apiFetch("/api/v1/marketplace/engagements/" + engagementId + "/" + action, {
+    method: "POST",
+    body: body,
+  });
+}

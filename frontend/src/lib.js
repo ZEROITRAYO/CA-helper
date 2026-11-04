@@ -14,6 +14,7 @@ export const USER_ROLE_LABELS = {
   admin: "Admin",
 };
 
+
 export function label(labels, code) {
   return labels[code] ?? code;
 }
@@ -27,12 +28,15 @@ export function loadSession() {
   }
 }
 
+
+
 export function saveSession(session) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   } catch {
   }
 }
+
 
 export function clearSession() {
   try {
@@ -57,6 +61,7 @@ export const emailSchema = z.email("Enter a valid email address");
 export function passwordsMatch(values) {
   return values.password === values.confirm_password;
 }
+
 
 export const PASSWORDS_MATCH_ERROR = {
   message: "The password do not match",
@@ -96,7 +101,6 @@ export const ENTITY_TYPE_LABELS = {
   llp: "LLP",
   private_limited: "Private limited company",
 };
-
 
 
 
@@ -176,6 +180,15 @@ export const FORM_LABELS = {
   tds_26q: "TDS return 26Q (other payments)",
 };
 
+
+export const ENGAGEMENT_STATUS_LABELS = {
+  requested: "Requested",
+  active: "Active",
+  completed: "Completed",
+  declined: "Declined",
+  cancelled: "Cancelled",
+};
+
 export function filingFormLabel(formCode) {
   return label(FORM_LABELS, formCode);
 }
@@ -234,8 +247,6 @@ export function daysLeftText(date) {
   
   return -1 * days + " days ago";
 }
-
-
 
 
 
@@ -301,3 +312,6 @@ export const CA_LANGUAGE_LABELS = {
 export function labelList(labels, codes) {
   return codes.map((code) => label(labels, code)).join(", ");
 }
+
+
+
