@@ -50,7 +50,7 @@ def documents_by_filing(filings):  #files linked to each filing, acknowledgement
                 "doc_type": d.doc_type, "size_bytes": d.size_bytes, "created_at": iso(d.created_at),
                 "checklist_key": key})
     
-    result[filing.id] = documents 
+        result[filing.id] = documents 
     
     return result
 

@@ -12,6 +12,8 @@ import { DocumentsPage } from "@/pages/business/DocumentsPage";
 import { CaProfilePage, CaServicesPage } from "@/pages/ca/ProfilePage";
 import { AdminCaDetailPage, AdminDashboardPage, AdminUsersPage } from "@/pages/admin/AdminPages";
 import { CaDetailPage, MarketplacePage, RequestCaPage } from "@/pages/business/FindCaPage";
+import { CaBatchesPage, CaClientPage, CaWorkspacePage } from "@/pages/ca/ClientsPage";
+import { CaDashboardPage } from "@/pages/ca/DashboardPage";
 
 
 
@@ -87,9 +89,13 @@ export const appRoutes = [
   ]),
 
   roleArea("ca", [
+  { index: true, element: <CaDashboardPage /> },
   { path: "settings", element: <SettingsPage /> },
   { path: "profile", element: <CaProfilePage /> },
   { path: "services", element: <CaServicesPage /> },
+  { path: "clients", element: <CaWorkspacePage /> },
+  { path: "clients/:businessId", element: <CaClientPage /> },
+  { path: "batches", element: <CaBatchesPage /> },
   ]),
 
 
