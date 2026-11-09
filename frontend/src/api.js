@@ -431,6 +431,44 @@ export function rejectCa(caId, reason) {
   return apiFetch("/api/v1/admin/cas/" + caId + "/reject", { method: "POST", body: { reason } });
 }
 
+export function useCaDashboard() {
+  return useGet([...CA_WORKSPACE_KEY, "dashboard"], "/api/v1/ca-workspace/dashboard");
+}
+
+export function useCaClients() {
+  return useGet([...CA_WORKSPACE_KEY, "clients"], "/api/v1/ca-workspace/clients");
+}
+
+
+export function useCaClient(businessId) {
+  const path = "/api/v1/ca-workspace/clients/" + businessId;
+  return useGet([...CA_WORKSPACE_KEY, "client", businessId], path);
+}
+
+
+export function useCaBatches() {
+  return useGet([...CA_WORKSPACE_KEY, "batches"], "/api/v1/ca-workspace/batches");
+}
+
+
+
+export function createDocumentRequest(businessId, complianceItemId, checklistKey, message) {
+  return apiFetch("/api/v1/ca-workspace/clients/" + businessId + "/document-requests", {
+    method: "POST",
+    body: { compliance_item_id: complianceItemId, checklist_key: checklistKey, message },
+  });
+}
+
+export function cancelDocumentRequest(requestId) {
+  return apiFetch("/api/v1/ca-workspace/document-requests/" + requestId + "/cancel", { method: "POST" });
+}
+
+/** The CA filed one filing. Both the ARN and the file are optional. */
+export function caMarkFiled(businessId, itemId, acknowledgementNo, file) {
+  const path = "/api/v1/ca-workspace/clients/" + businessId + "/filings/" + itemId + "/mark-filed";
+  return sendForm(path, { acknowledgement_no: acknowledgementNo, file });
+}
+
 
 
 
