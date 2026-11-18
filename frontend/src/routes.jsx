@@ -86,6 +86,7 @@ export const appRoutes = [
     { path: "compliance", element: <CompliancePage /> },
     { path: "marketplace", element: <MarketplacePage /> },
     { path: "marketplace/:caId", element: <CaDetailPage /> },
+    { path: "engagements", element: <MyEngagementsPage /> },
   ]),
 
   roleArea("ca", [
@@ -96,6 +97,7 @@ export const appRoutes = [
   { path: "clients", element: <CaWorkspacePage /> },
   { path: "clients/:businessId", element: <CaClientPage /> },
   { path: "batches", element: <CaBatchesPage /> },
+  { path: "engagements", element: <CaEngagementsPage /> },  
   ]),
 
 
