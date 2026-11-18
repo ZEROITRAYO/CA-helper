@@ -14,6 +14,8 @@ import { AdminCaDetailPage, AdminDashboardPage, AdminUsersPage } from "@/pages/a
 import { CaDetailPage, MarketplacePage, RequestCaPage } from "@/pages/business/FindCaPage";
 import { CaBatchesPage, CaClientPage, CaWorkspacePage } from "@/pages/ca/ClientsPage";
 import { CaDashboardPage } from "@/pages/ca/DashboardPage";
+import { CaEngagementsPage } from "@/pages/ca/EngagementsPage";
+import { MyEngagementsPage } from "@/pages/business/EngagementsPage";
 
 
 
@@ -86,6 +88,7 @@ export const appRoutes = [
     { path: "compliance", element: <CompliancePage /> },
     { path: "marketplace", element: <MarketplacePage /> },
     { path: "marketplace/:caId", element: <CaDetailPage /> },
+    { path: "engagements", element: <MyEngagementsPage /> },
   ]),
 
   roleArea("ca", [
@@ -96,6 +99,7 @@ export const appRoutes = [
   { path: "clients", element: <CaWorkspacePage /> },
   { path: "clients/:businessId", element: <CaClientPage /> },
   { path: "batches", element: <CaBatchesPage /> },
+  { path: "engagements", element: <CaEngagementsPage /> },  
   ]),
 
 
