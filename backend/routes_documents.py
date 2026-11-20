@@ -195,6 +195,17 @@ def open_document(document_id):
     return send_document(document)
 
 
+def untick_if_no_file(filing, key):
+    if key == "general":
+        return
+
+    still_linked = ComplianceItemDocument.query.filter_by(
+        compliance_item_id=filing.id, checklist_key=key).first()
+
+    if still_linked is None:
+        set_tick(filing, key, False)
+
+
 @app.route("/api/v1/documents/<uuid:document_id>", methods=["DELETE"])
 @role_required("business")
 def delete_document(document_id):
@@ -209,7 +220,9 @@ def delete_document(document_id):
         return error(409, "DOCUMENT_IN_USE", f"This is the acknowledgement of {filing_name(ack)} "
                      'Undo "mark as filed" on that filing to remove it')
     
-    for link in ComplianceItemDocument.query.filter_by(document_id=document.id):
+    links = ComplianceItemDocument.query.filter_by(document_id=document.id).all()
+
+    for link in links:
         filing = db.session.get(ComplianceItem, link.compliance_item_id)
         
         if filing.status in DONE:
@@ -217,9 +230,12 @@ def delete_document(document_id):
                          "which is filed, so it cannot be deleted")
     
     remove_document(document.id)
-    
+
+    for link in links:
+        untick_if_no_file(db.session.get(ComplianceItem, link.compliance_item_id), link.checklist_key)
+
     db.session.commit()
-    
+
     return "", 204
 
 
@@ -260,11 +276,16 @@ def unlink_document(link_id):
     
     if filing.status in DONE:
         return error(409, "FILING_LOCKED", "This filing is filed, so its documents can no longer change")
-    
+
+    key = link.checklist_key
+
     db.session.delete(link)
-    
+    db.session.flush()
+
+    untick_if_no_file(filing, key)
+
     db.session.commit()
-    
+
     return "", 204
 
 

@@ -127,6 +127,16 @@ def resend_otp():
     
     if user.email_verified:
         return error(409, "EMAIL_ALREADY_VERIFIED", "This email is already verified. Log in")
+
+    last_otp = EmailOtp.query.filter_by(user_id=user.id, purpose="verify_email")
+    last_otp = last_otp.order_by(EmailOtp.created_at.desc()).first()
+
+    if last_otp:
+        wait = 60 - int((db_now() - last_otp.created_at).total_seconds())
+       
+        if wait > 0:
+            return error(429, "WAIT_OTP", f"Wait {wait} seconds before asking for a new OTP")
+    
     send_otp(user, "verify_email")
     
     return "", 204
