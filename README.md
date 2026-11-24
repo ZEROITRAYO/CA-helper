@@ -177,11 +177,3 @@ frontend/src/pages/admin/
 | File | What it does |
 |---|---|
 | AdminPages.jsx | Admin dashboard, list of users and CAs, and one CA's page to open the certificate and verify or reject. |
-
-
-
-### AI Usage
-- Used for making json of content like what is GST, steps to file it.
-- Research and planning of project.
- - Documents for testing wherever OCR was used.
-- Code Debugging
